@@ -1,7 +1,6 @@
 package org.schabi.newpipe.fragments.detail;
 
 import static android.text.TextUtils.isEmpty;
-import static org.schabi.newpipe.extractor.StreamingService.ServiceInfo.MediaCapability.COMMENTS;
 import static org.schabi.newpipe.extractor.stream.StreamExtractor.NO_AGE_LIMIT;
 import static org.schabi.newpipe.ktx.ViewUtils.animate;
 import static org.schabi.newpipe.ktx.ViewUtils.animateRotation;
@@ -73,10 +72,8 @@ import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.ReCaptchaActivity;
 import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.extractor.Image;
-import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.comments.CommentsInfoItem;
 import org.schabi.newpipe.extractor.exceptions.ContentNotSupportedException;
-import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.Stream;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
@@ -975,14 +972,7 @@ public final class VideoDetailFragment
     }
 
     private boolean shouldShowComments() {
-        try {
-            return showComments && NewPipe.getService(serviceId)
-                    .getServiceInfo()
-                    .getMediaCapabilities()
-                    .contains(COMMENTS);
-        } catch (final ExtractionException e) {
-            return false;
-        }
+        return false; // comments disabled in Slipstream
     }
 
     public void updateTabLayoutVisibility() {

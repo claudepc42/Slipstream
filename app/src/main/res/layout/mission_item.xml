@@ -1,99 +1,115 @@
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:layout_margin="4dp"
+    app:cardCornerRadius="4dp"
+    app:cardElevation="2dp"
+    app:cardBackgroundColor="?attr/colorPrimary">
 
-    <RelativeLayout
-        android:id="@+id/item_bkg"
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="2dp"
-        android:background="@color/bluegray">
+        android:layout_height="wrap_content">
 
-        <RelativeLayout
-            android:id="@+id/item_title_line"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_alignParentTop="true"
-            android:layout_marginTop="2dp">
-
-            <org.schabi.newpipe.views.NewPipeTextView
-                android:id="@+id/item_status"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentLeft="true"
-                android:layout_centerVertical="true"
-                android:layout_marginLeft="6dp"
-                android:singleLine="true"
-                android:text="0%"
-                android:textColor="@color/white"
-                android:textSize="20sp" />
+        <!-- 16:9 thumbnail area — ProgressDrawable fills this as download progress -->
+        <FrameLayout
+            android:id="@+id/item_bkg"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="#1a1a2e"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintDimensionRatio="16:9">
 
             <ImageView
-                android:id="@+id/item_more"
-                style="?attr/buttonBarButtonStyle"
-                android:layout_width="49dp"
-                android:layout_height="49dp"
-                android:layout_alignParentRight="true"
-                android:layout_centerVertical="true"
-                android:layout_marginRight="1dp"
-                android:contentDescription="TODO"
-                android:scaleType="center"
-                android:src="@drawable/ic_more_vert"
+                android:id="@+id/item_icon"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:scaleType="fitCenter"
+                android:contentDescription="@null"
                 app:tint="?attr/actionColor" />
 
-        </RelativeLayout>
+        </FrameLayout>
 
-        <ImageView
-            android:id="@+id/item_icon"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:layout_below="@id/item_title_line"
-            android:layout_centerHorizontal="true"
-            android:contentDescription="TODO"
-            android:gravity="center"
-            android:padding="10dp"
-            android:scaleType="fitXY"
-            app:tint="?attr/actionColor" />
-
+        <!-- Filename + overflow button -->
         <org.schabi.newpipe.views.NewPipeTextView
             android:id="@+id/item_name"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_below="@id/item_icon"
-            android:ellipsize="marquee"
-            android:marqueeRepeatLimit="marquee_forever"
-            android:padding="6dp"
-            android:scrollHorizontally="true"
-            android:singleLine="true"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="6dp"
+            android:ellipsize="end"
+            android:maxLines="2"
             android:text="XXX.xx"
-            android:textColor="@color/white"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            app:layout_constraintTop_toBottomOf="@id/item_bkg"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/item_more" />
 
+        <ImageView
+            android:id="@+id/item_more"
+            style="?attr/buttonBarButtonStyle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="4dp"
+            android:contentDescription="@null"
+            android:scaleType="center"
+            android:src="@drawable/ic_more_vert"
+            app:tint="?attr/actionColor"
+            app:layout_constraintTop_toBottomOf="@id/item_bkg"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- Size -->
         <org.schabi.newpipe.views.NewPipeTextView
             android:id="@+id/item_size"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_below="@id/item_name"
-            android:padding="6dp"
-            android:singleLine="true"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="8dp"
             android:text="100.00MB"
-            android:textColor="@color/white"
-            android:textSize="12sp" />
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="11sp"
+            app:layout_constraintTop_toBottomOf="@id/item_name"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/item_status"
+            app:layout_constraintBottom_toBottomOf="parent" />
 
+        <!-- Status (percentage) -->
+        <org.schabi.newpipe.views.NewPipeTextView
+            android:id="@+id/item_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="8dp"
+            android:text="0%"
+            android:textColor="?attr/colorAccent"
+            android:textSize="11sp"
+            app:layout_constraintTop_toBottomOf="@id/item_name"
+            app:layout_constraintEnd_toStartOf="@+id/item_date"
+            app:layout_constraintBottom_toBottomOf="parent" />
+
+        <!-- Date -->
         <org.schabi.newpipe.views.NewPipeTextView
             android:id="@+id/item_date"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_below="@id/item_name"
-            android:layout_alignParentRight="true"
-            android:padding="6dp"
-            android:singleLine="true"
+            android:layout_marginTop="2dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="8dp"
             android:text=""
-            android:textColor="@color/white"
-            android:textSize="12sp" />
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="11sp"
+            app:layout_constraintTop_toBottomOf="@id/item_name"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
 
-    </RelativeLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
-</RelativeLayout>
+</androidx.cardview.widget.CardView>

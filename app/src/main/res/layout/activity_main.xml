@@ -12,11 +12,22 @@
             android:id="@+id/fragment_holder"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginTop="?attr/actionBarSize" />
+            android:layout_marginTop="?attr/actionBarSize"
+            android:layout_marginBottom="56dp" />
 
         <include
             layout="@layout/toolbar_layout"
             android:id="@+id/toolbar_layout"/>
+
+        <com.google.android.material.bottomnavigation.BottomNavigationView
+            android:id="@+id/bottom_navigation_view"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_gravity="bottom"
+            android:background="?android:attr/windowBackground"
+            app:itemIconTint="?attr/colorAccent"
+            app:itemTextColor="?attr/colorAccent"
+            app:menu="@menu/bottom_navigation" />
 
         <androidx.fragment.app.FragmentContainerView
             android:id="@+id/fragment_player_holder"

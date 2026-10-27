@@ -102,7 +102,7 @@ public class MissionsFragment extends Fragment {
         View v = inflater.inflate(R.layout.missions, container, false);
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(requireActivity());
-        mLinear = mPrefs.getBoolean("linear", false);
+        mLinear = false; // always grid mode
 
         // Bind the service
         mContext.bindService(new Intent(mContext, DownloadManagerService.class), mConnection, Context.BIND_AUTO_CREATE);
@@ -187,11 +187,7 @@ public class MissionsFragment extends Fragment {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int itemId = item.getItemId();
-        if (itemId == R.id.switch_mode) {
-            mLinear = !mLinear;
-            updateList();
-            return true;
-        } else if (itemId == R.id.clear_list) {
+        if (itemId == R.id.clear_list) {
             showClearDownloadHistoryPrompt();
             return true;
         } else if (itemId == R.id.start_downloads) {
@@ -246,11 +242,7 @@ public class MissionsFragment extends Fragment {
         mList.setAdapter(mAdapter);
 
         if (mSwitch != null) {
-            mSwitch.setIcon(mLinear
-                            ? R.drawable.ic_apps
-                            : R.drawable.ic_list);
-            mSwitch.setTitle(mLinear ? R.string.grid : R.string.list);
-            mPrefs.edit().putBoolean("linear", mLinear).apply();
+            mSwitch.setVisible(false);
         }
     }
 

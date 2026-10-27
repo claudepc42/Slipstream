@@ -58,6 +58,7 @@ import androidx.fragment.app.FragmentContainerView;
 import androidx.fragment.app.FragmentManager;
 import androidx.preference.PreferenceManager;
 
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 
 import org.schabi.newpipe.databinding.ActivityMainBinding;
@@ -81,16 +82,13 @@ import org.schabi.newpipe.player.Player;
 import org.schabi.newpipe.player.event.OnKeyDownListener;
 import org.schabi.newpipe.player.helper.PlayerHolder;
 import org.schabi.newpipe.player.playqueue.PlayQueue;
-import org.schabi.newpipe.settings.UpdateSettingsFragment;
 import org.schabi.newpipe.settings.migration.MigrationManager;
 import org.schabi.newpipe.util.Constants;
 import org.schabi.newpipe.util.DeviceUtils;
-import org.schabi.newpipe.util.KioskTranslator;
 import org.schabi.newpipe.util.Localization;
 import org.schabi.newpipe.util.NavigationHelper;
 import org.schabi.newpipe.util.PeertubeHelper;
 import org.schabi.newpipe.util.PermissionHelper;
-import org.schabi.newpipe.util.ReleaseVersionUtil;
 import org.schabi.newpipe.util.SerializedCache;
 import org.schabi.newpipe.util.ServiceHelper;
 import org.schabi.newpipe.util.StateSaver;
@@ -188,24 +186,7 @@ public class MainActivity extends AppCompatActivity {
         }
         openMiniPlayerUponPlayerStarted();
 
-        if (PermissionHelper.checkPostNotificationsPermission(this,
-                PermissionHelper.POST_NOTIFICATIONS_REQUEST_CODE)) {
-            // Schedule worker for checking for new streams and creating corresponding notifications
-            // if this is enabled by the user.
-            NotificationWorker.initialize(this);
-        }
-        if (!UpdateSettingsFragment.wasUserAskedForConsent(this)
-                && !App.getInstance().isFirstRun()
-                && ReleaseVersionUtil.INSTANCE.isReleaseApk()) {
-            UpdateSettingsFragment.askForConsentToUpdateChecks(this);
-        }
-
-        // ReleaseVersionUtil.INSTANCE.isReleaseApk() will be true only for main official build
-        // We want every release build (nightly, nightly-refactor) to show the popup
-        if (!DEBUG) {
-            showKeepAndroidDialog();
-            showApi23RequirementDialog();
-        }
+        setupBottomNavigation();
 
         MigrationManager.showUserInfoIfPresent(this);
     }
@@ -213,16 +194,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPostCreate(final Bundle savedInstanceState) {
         super.onPostCreate(savedInstanceState);
-
-        final App app = App.getInstance();
-
-        if (sharedPreferences.getBoolean(app.getString(R.string.update_app_key), false)
-                && sharedPreferences
-                .getBoolean(app.getString(R.string.update_check_consent_key), false)) {
-            // Start the worker which is checking all conditions
-            // and eventually searching for a new version.
-            NewVersionWorker.enqueueNewVersionCheckingWork(app, false);
-        }
     }
 
     @Override
@@ -274,46 +245,10 @@ public class MainActivity extends AppCompatActivity {
      * @throws ExtractionException if the service didn't provide available kiosks
      */
     private void addDrawerMenuForCurrentService() throws ExtractionException {
-        //Tabs
-        drawerLayoutBinding.navigation.getMenu()
-                .add(R.id.menu_tabs_group, ITEM_ID_SUBSCRIPTIONS, ORDER,
-                        R.string.tab_subscriptions)
-                .setIcon(R.drawable.ic_tv);
-        drawerLayoutBinding.navigation.getMenu()
-                .add(R.id.menu_tabs_group, ITEM_ID_FEED, ORDER, R.string.fragment_feed_title)
-                .setIcon(R.drawable.ic_subscriptions);
-        drawerLayoutBinding.navigation.getMenu()
-                .add(R.id.menu_tabs_group, ITEM_ID_BOOKMARKS, ORDER, R.string.tab_bookmarks)
-                .setIcon(R.drawable.ic_bookmark);
-        drawerLayoutBinding.navigation.getMenu()
-                .add(R.id.menu_tabs_group, ITEM_ID_DOWNLOADS, ORDER, R.string.downloads)
-                .setIcon(R.drawable.ic_file_download);
-        drawerLayoutBinding.navigation.getMenu()
-                .add(R.id.menu_tabs_group, ITEM_ID_HISTORY, ORDER, R.string.action_history)
-                .setIcon(R.drawable.ic_history);
-
-        //Kiosks
-        final int currentServiceId = ServiceHelper.getSelectedServiceId(this);
-        final StreamingService service = NewPipe.getService(currentServiceId);
-
-        int kioskMenuItemId = 0;
-
-        for (final String ks : service.getKioskList().getAvailableKiosks()) {
-            drawerLayoutBinding.navigation.getMenu()
-                    .add(R.id.menu_kiosks_group, kioskMenuItemId, 0, KioskTranslator
-                            .getTranslatedKioskName(ks, this))
-                    .setIcon(KioskTranslator.getKioskIcon(ks));
-            kioskMenuItemId++;
-        }
-
-        //Settings and About
+        // Settings and About only — main navigation is via the bottom nav bar
         drawerLayoutBinding.navigation.getMenu()
                 .add(R.id.menu_options_about_group, ITEM_ID_SETTINGS, ORDER, R.string.settings)
                 .setIcon(R.drawable.ic_settings);
-        drawerLayoutBinding.navigation.getMenu()
-                .add(R.id.menu_options_about_group, ITEM_ID_DONATION, ORDER,
-                        R.string.donation_title)
-                .setIcon(R.drawable.volunteer_activism_ic);
         drawerLayoutBinding.navigation.getMenu()
                 .add(R.id.menu_options_about_group, ITEM_ID_ABOUT, ORDER, R.string.tab_about)
                 .setIcon(R.drawable.ic_info_outline);
@@ -352,45 +287,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void tabSelected(final MenuItem item) {
-        switch (item.getItemId()) {
-            case ITEM_ID_SUBSCRIPTIONS:
-                NavigationHelper.openSubscriptionFragment(getSupportFragmentManager());
-                break;
-            case ITEM_ID_FEED:
-                NavigationHelper.openFeedFragment(getSupportFragmentManager());
-                break;
-            case ITEM_ID_BOOKMARKS:
-                NavigationHelper.openBookmarksFragment(getSupportFragmentManager());
-                break;
-            case ITEM_ID_DOWNLOADS:
-                NavigationHelper.openDownloads(this);
-                break;
-            case ITEM_ID_HISTORY:
-                NavigationHelper.openStatisticFragment(getSupportFragmentManager());
-                break;
-        }
+        // drawer tabs stripped — navigation via bottom nav bar
     }
 
     private void kioskSelected(final MenuItem item) throws ExtractionException {
-        final StreamingService currentService = ServiceHelper.getSelectedService(this);
-        int kioskMenuItemId = 0;
-        for (final String kioskId : currentService.getKioskList().getAvailableKiosks()) {
-            if (kioskMenuItemId == item.getItemId()) {
-                NavigationHelper.openKioskFragment(getSupportFragmentManager(),
-                        currentService.getServiceId(), kioskId);
-                break;
-            }
-            kioskMenuItemId++;
-        }
+        // kiosks removed from Slipstream
     }
 
     private void optionsAboutSelected(final MenuItem item) {
         switch (item.getItemId()) {
             case ITEM_ID_SETTINGS:
                 NavigationHelper.openSettings(this);
-                break;
-            case ITEM_ID_DONATION:
-                ShareUtils.openUrlInBrowser(this, getString(R.string.donation_url));
                 break;
             case ITEM_ID_ABOUT:
                 NavigationHelper.openAbout(this);
@@ -420,8 +327,6 @@ public class MainActivity extends AppCompatActivity {
         servicesShown = !servicesShown;
 
         drawerLayoutBinding.navigation.getMenu().removeGroup(R.id.menu_services_group);
-        drawerLayoutBinding.navigation.getMenu().removeGroup(R.id.menu_tabs_group);
-        drawerLayoutBinding.navigation.getMenu().removeGroup(R.id.menu_kiosks_group);
         drawerLayoutBinding.navigation.getMenu().removeGroup(R.id.menu_options_about_group);
 
         // Show up or down arrow
@@ -554,10 +459,7 @@ public class MainActivity extends AppCompatActivity {
             NavigationHelper.openMainActivity(this);
         }
 
-        final boolean isHistoryEnabled = sharedPreferences.getBoolean(
-                getString(R.string.enable_watch_history_key), true);
-        drawerLayoutBinding.navigation.getMenu().findItem(ITEM_ID_HISTORY)
-                .setVisible(isHistoryEnabled);
+        // history tab removed from drawer
     }
 
     @Override
@@ -759,23 +661,44 @@ public class MainActivity extends AppCompatActivity {
     // Init
     //////////////////////////////////////////////////////////////////////////*/
 
+    private void setupBottomNavigation() {
+        final BottomNavigationView bottomNav = mainBinding.bottomNavigationView;
+        bottomNav.setOnItemSelectedListener(item -> {
+            final int id = item.getItemId();
+            if (id == R.id.nav_search) {
+                openSearchAsHome();
+                return true;
+            } else if (id == R.id.nav_downloads) {
+                NavigationHelper.openDownloads(this);
+                return true;
+            } else if (id == R.id.nav_playlists) {
+                NavigationHelper.openBookmarksFragment(getSupportFragmentManager());
+                return true;
+            }
+            return false;
+        });
+    }
+
     private void initFragments() {
         if (DEBUG) {
             Log.d(TAG, "initFragments() called");
         }
         StateSaver.clearStateFiles();
         if (getIntent() != null && getIntent().hasExtra(Constants.KEY_LINK_TYPE)) {
-            // When user watch a video inside popup and then tries to open the video in main player
-            // while the app is closed he will see a blank fragment on place of kiosk.
-            // Let's open it first
             if (getSupportFragmentManager().getBackStackEntryCount() == 0) {
-                NavigationHelper.openMainFragment(getSupportFragmentManager());
+                openSearchAsHome();
             }
-
             handleIntent(getIntent());
         } else {
-            NavigationHelper.gotoMainFragment(getSupportFragmentManager());
+            openSearchAsHome();
         }
+    }
+
+    private void openSearchAsHome() {
+        NavigationHelper.openSearchFragment(
+                getSupportFragmentManager(),
+                ServiceHelper.getSelectedServiceId(this),
+                "");
     }
 
     /*//////////////////////////////////////////////////////////////////////////
