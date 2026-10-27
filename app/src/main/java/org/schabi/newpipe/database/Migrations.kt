@@ -30,6 +30,7 @@ object Migrations {
     const val DB_VER_7 = 7
     const val DB_VER_8 = 8
     const val DB_VER_9 = 9
+    const val DB_VER_10 = 10
 
     private val TAG = Migrations::class.java.getName()
     private val isDebug = MainActivity.DEBUG
@@ -339,6 +340,21 @@ object Migrations {
         connection.execSQL(
             "CREATE UNIQUE INDEX `index_remote_playlists_service_id_url` " +
                 "ON `remote_playlists` (`service_id`, `url`)"
+        )
+    }
+
+    val MIGRATION_9_10 = Migration(DB_VER_9, DB_VER_10) { connection ->
+        connection.execSQL(
+            "CREATE TABLE IF NOT EXISTS `imported_files` " +
+                "(`uid` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`file_uri` TEXT NOT NULL, `title` TEXT NOT NULL, " +
+                "`thumbnail_url` TEXT, `uploader` TEXT, `video_id` TEXT, " +
+                "`duration_seconds` INTEGER NOT NULL DEFAULT 0, " +
+                "`file_name` TEXT NOT NULL)"
+        )
+        connection.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_imported_files_file_uri` " +
+                "ON `imported_files` (`file_uri`)"
         )
     }
 }

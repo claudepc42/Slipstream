@@ -13,6 +13,7 @@ import androidx.fragment.app.FragmentTransaction;
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.databinding.ActivityDownloaderBinding;
+import org.schabi.newpipe.qr.QrScanActivity;
 import org.schabi.newpipe.util.DeviceUtils;
 import org.schabi.newpipe.util.ThemeHelper;
 import org.schabi.newpipe.views.FocusOverlayView;
@@ -55,6 +56,10 @@ public class DownloadActivity extends AppCompatActivity {
                 updateFragments();
                 getWindow().getDecorView().getViewTreeObserver().removeOnGlobalLayoutListener(this);
             }
+        });
+
+        downloaderBinding.fabQrScan.setOnClickListener(v -> {
+            startActivity(new Intent(this, QrScanActivity.class));
         });
 
         if (DeviceUtils.isTv(this)) {

@@ -77,6 +77,7 @@ teamnewpipe-nanojson = "e9d656ddb49a412a5a0a5d5ef20ca7ef09549996"
 # to cause jitpack to regenerate the artifact.
 teamnewpipe-newpipe-extractor = "e8f89145a830b4d6cae32412007f24ea8b36c73a"
 viewpager2 = "1.1.0"
+zxing-android-embedded = "4.3.0"
 webkit = "1.15.0" # New versions require minSdk 24
 work = "2.11.2" # New versions require minSdk 24
 
@@ -176,6 +177,7 @@ squareup-okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhtt
 squareup-okhttp-brotli = { module = "com.squareup.okhttp3:okhttp-brotli", version.ref = "okhttp" }
 touchlab-kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 zacsweers-autoservice-compiler = { module = "dev.zacsweers.autoservice:auto-service-ksp", version.ref = "autoservice-zacsweers" }
+zxing-android-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxing-android-embedded" }
 
 [plugins]
 about-libraries = { id = "com.mikepenz.aboutlibraries.plugin", version.ref = "about-libraries" }

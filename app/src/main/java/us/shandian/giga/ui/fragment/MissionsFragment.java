@@ -15,7 +15,18 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.activity.result.contract.ActivityResultContracts;
+
+import org.schabi.newpipe.NewPipeDatabase;
+import org.schabi.newpipe.local.downloads.FolderScanManager;
+
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
+
+import us.shandian.giga.ui.adapter.ImportedFilesAdapter;
 
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
@@ -58,18 +69,39 @@ public class MissionsFragment extends Fragment {
     private MenuItem mPause = null;
 
     private RecyclerView mList;
+    private RecyclerView mImportedList;
+    private TextView mImportedHeader;
     private View mEmpty;
     private MissionAdapter mAdapter;
+    private ImportedFilesAdapter mImportedAdapter;
     private GridLayoutManager mGridManager;
     private LinearLayoutManager mLinearManager;
     private Context mContext;
 
     private DownloadManagerBinder mBinder;
     private boolean mForceUpdate;
+    private final CompositeDisposable disposables = new CompositeDisposable();
 
     private DownloadMission unsafeMissionTarget = null;
     private final ActivityResultLauncher<Intent> requestDownloadSaveAsLauncher =
             registerForActivityResult(new StartActivityForResult(), this::requestDownloadSaveAsResult);
+    private final ActivityResultLauncher<Uri> folderScanLauncher =
+            registerForActivityResult(new ActivityResultContracts.OpenDocumentTree(), uri -> {
+                if (uri == null) return;
+                requireContext().getContentResolver().takePersistableUriPermission(
+                        uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                Toast.makeText(mContext, R.string.folder_scan_scanning, Toast.LENGTH_SHORT).show();
+                disposables.add(
+                    FolderScanManager.INSTANCE.scanFolder(requireContext(), uri)
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(
+                            count -> Toast.makeText(mContext,
+                                getString(R.string.folder_scan_done, count), Toast.LENGTH_LONG).show(),
+                            err -> Toast.makeText(mContext,
+                                err.getMessage(), Toast.LENGTH_LONG).show()
+                        )
+                );
+            });
     private final ServiceConnection mConnection = new ServiceConnection() {
 
         @Override
@@ -110,6 +142,25 @@ public class MissionsFragment extends Fragment {
         // Views
         mEmpty = v.findViewById(R.id.list_empty_view);
         mList = v.findViewById(R.id.mission_recycler);
+        mImportedList = v.findViewById(R.id.imported_files_recycler);
+        mImportedHeader = v.findViewById(R.id.imported_files_header);
+
+        // Set up imported files adapter
+        mImportedAdapter = new ImportedFilesAdapter(mContext);
+        mImportedList.setAdapter(mImportedAdapter);
+        mImportedList.setLayoutManager(new GridLayoutManager(getActivity(), SPAN_SIZE));
+
+        // Observe imported files from DB
+        disposables.add(
+            NewPipeDatabase.getInstance(mContext).importedFileDAO().getAll()
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(items -> {
+                    mImportedAdapter.setItems(items);
+                    int visibility = items.isEmpty() ? View.GONE : View.VISIBLE;
+                    mImportedList.setVisibility(visibility);
+                    mImportedHeader.setVisibility(visibility);
+                }, err -> { /* ignore */ })
+        );
 
         // Init layouts managers
         mGridManager = new GridLayoutManager(getActivity(), SPAN_SIZE);
@@ -161,6 +212,11 @@ public class MissionsFragment extends Fragment {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        disposables.clear();
+        if (mImportedAdapter != null) {
+            mImportedAdapter.onDestroy();
+            mImportedAdapter = null;
+        }
         if (mBinder == null || mAdapter == null) return;
 
         mBinder.removeMissionEventListener(mAdapter);
@@ -198,6 +254,9 @@ public class MissionsFragment extends Fragment {
             mAdapter.refreshMissionItems();// update items view
 
             return super.onOptionsItemSelected(item);
+        } else if (itemId == R.id.scan_folder) {
+            folderScanLauncher.launch(null);
+            return true;
         }
         return super.onOptionsItemSelected(item);
     }

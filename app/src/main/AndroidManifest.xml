@@ -88,6 +88,16 @@
             android:launchMode="singleTask" />
 
         <activity
+            android:name=".qr.QrScanActivity"
+            android:exported="false"
+            android:label="@string/qr_scan_prompt" />
+
+        <activity
+            android:name=".qr.QrPresetsActivity"
+            android:exported="false"
+            android:label="@string/qr_presets_title" />
+
+        <activity
             android:name=".settings.SettingsActivity"
             android:exported="false"
             android:label="@string/settings" />

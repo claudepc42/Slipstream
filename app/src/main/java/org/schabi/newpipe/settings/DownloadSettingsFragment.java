@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+
+import org.schabi.newpipe.qr.QrPresetsActivity;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -168,7 +170,10 @@ public class DownloadSettingsFragment extends BasePreferenceFragment {
 
         final String key = preference.getKey();
 
-        if (key.equals(storageUseSafPreference)) {
+        if (key.equals("qr_presets_key")) {
+            startActivity(new Intent(requireContext(), QrPresetsActivity.class));
+            return true;
+        } else if (key.equals(storageUseSafPreference)) {
             if (!NewPipeSettings.useStorageAccessFramework(ctx)) {
                 NewPipeSettings.saveDefaultVideoDownloadDirectory(ctx);
                 NewPipeSettings.saveDefaultAudioDownloadDirectory(ctx);

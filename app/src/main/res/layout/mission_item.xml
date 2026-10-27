@@ -13,7 +13,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <!-- 16:9 thumbnail area — ProgressDrawable fills this as download progress -->
+        <!-- 16:9 thumbnail area -->
         <FrameLayout
             android:id="@+id/item_bkg"
             android:layout_width="0dp"
@@ -24,6 +24,15 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintDimensionRatio="16:9">
 
+            <!-- Thumbnail image -->
+            <ImageView
+                android:id="@+id/item_thumbnail"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:contentDescription="@null" />
+
+            <!-- Fallback icon shown when no thumbnail -->
             <ImageView
                 android:id="@+id/item_icon"
                 android:layout_width="48dp"
@@ -31,7 +40,24 @@
                 android:layout_gravity="center"
                 android:scaleType="fitCenter"
                 android:contentDescription="@null"
-                app:tint="?attr/actionColor" />
+                app:tint="?attr/actionColor"
+                android:visibility="gone" />
+
+            <!-- Download progress fill (ProgressDrawable background on this overlay) -->
+            <View
+                android:id="@+id/item_progress_overlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:alpha="0.0" />
+
+            <!-- Watch progress bar at bottom of thumbnail (scaleX + pivotX=0 used for progress) -->
+            <View
+                android:id="@+id/item_watch_progress"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:layout_gravity="bottom|start"
+                android:background="?attr/colorAccent"
+                android:visibility="gone" />
 
         </FrameLayout>
 

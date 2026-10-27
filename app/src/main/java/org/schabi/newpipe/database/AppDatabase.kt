@@ -19,6 +19,8 @@ import org.schabi.newpipe.database.history.dao.SearchHistoryDAO
 import org.schabi.newpipe.database.history.dao.StreamHistoryDAO
 import org.schabi.newpipe.database.history.model.SearchHistoryEntry
 import org.schabi.newpipe.database.history.model.StreamHistoryEntity
+import org.schabi.newpipe.database.imported.ImportedFileDAO
+import org.schabi.newpipe.database.imported.ImportedFileEntity
 import org.schabi.newpipe.database.playlist.dao.PlaylistDAO
 import org.schabi.newpipe.database.playlist.dao.PlaylistRemoteDAO
 import org.schabi.newpipe.database.playlist.dao.PlaylistStreamDAO
@@ -34,7 +36,7 @@ import org.schabi.newpipe.database.subscription.SubscriptionEntity
 
 @ColumnTypeConverters(Converters::class)
 @Database(
-    version = Migrations.DB_VER_9,
+    version = Migrations.DB_VER_10,
     entities = [
         SubscriptionEntity::class,
         SearchHistoryEntry::class,
@@ -47,12 +49,14 @@ import org.schabi.newpipe.database.subscription.SubscriptionEntity
         FeedEntity::class,
         FeedGroupEntity::class,
         FeedGroupSubscriptionEntity::class,
-        FeedLastUpdatedEntity::class
+        FeedLastUpdatedEntity::class,
+        ImportedFileEntity::class
     ]
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun feedDAO(): FeedDAO
     abstract fun feedGroupDAO(): FeedGroupDAO
+    abstract fun importedFileDAO(): ImportedFileDAO
     abstract fun playlistDAO(): PlaylistDAO
     abstract fun playlistRemoteDAO(): PlaylistRemoteDAO
     abstract fun playlistStreamDAO(): PlaylistStreamDAO

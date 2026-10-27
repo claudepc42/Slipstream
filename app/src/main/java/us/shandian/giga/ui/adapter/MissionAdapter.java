@@ -66,6 +66,8 @@ import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
 import org.schabi.newpipe.util.Localization;
 import org.schabi.newpipe.util.NavigationHelper;
+import org.schabi.newpipe.util.WatchProgressHelper;
+import org.schabi.newpipe.util.image.CoilHelper;
 import org.schabi.newpipe.util.external_communication.ShareUtils;
 
 import java.io.File;
@@ -198,13 +200,16 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
         h.item = item;
 
         Utility.FileType type = Utility.getFileType(item.mission.kind, item.mission.storage.getName());
-
-        h.icon.setImageResource(Utility.getIconForFileType(type));
         h.name.setText(item.mission.storage.getName());
-
         h.progress.setColors(Utility.getBackgroundForFileType(mContext, type), Utility.getForegroundForFileType(mContext, type));
 
         if (h.item.mission instanceof DownloadMission) {
+            // Active download: show icon + progress animation, no thumbnail
+            h.thumbnail.setVisibility(View.GONE);
+            h.watchProgressBar.setVisibility(View.GONE);
+            h.icon.setVisibility(View.VISIBLE);
+            h.icon.setImageResource(Utility.getIconForFileType(type));
+
             DownloadMission mission = (DownloadMission) item.mission;
             String length = Utility.formatBytes(mission.getLength());
             if (mission.running && !mission.isPsRunning()) length += " --.- kB/s";
@@ -213,17 +218,53 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
             h.pause.setTitle(mission.unknownLength ? R.string.stop : R.string.pause);
             updateProgress(h);
             mPendingDownloadsItems.add(h);
-
             h.date.setText("");
         } else {
+            // Finished download: show thumbnail, hide icon, show watch progress
+            h.icon.setVisibility(View.GONE);
+            h.thumbnail.setVisibility(View.VISIBLE);
             h.progress.setMarquee(false);
             h.status.setText("100%");
-            h.progress.setProgress(1.0f);
+            h.progress.setProgress(0.0f); // no colored fill behind thumbnail
             h.size.setText(Utility.formatBytes(item.mission.length));
 
             DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.getDefault());
             Date date = new Date(item.mission.timestamp);
             h.date.setText(dateFormat.format(date));
+
+            // Load thumbnail from YouTube CDN if we have a video ID
+            final String source = item.mission.source;
+            final String videoId = WatchProgressHelper.INSTANCE.extractYouTubeVideoId(source);
+            if (videoId != null) {
+                CoilHelper.INSTANCE.loadThumbnail(h.thumbnail, WatchProgressHelper.INSTANCE.thumbnailUrlForId(videoId));
+            } else {
+                h.thumbnail.setImageResource(android.R.drawable.ic_menu_gallery);
+            }
+
+            // Load watch progress bar
+            if (source != null && !source.isEmpty()) {
+                WatchProgressHelper.INSTANCE.loadProgress(mContext, source)
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(
+                        pair -> {
+                            if (pair != null && pair.getSecond() > 0) {
+                                float fraction = (float) pair.getFirst() / (pair.getSecond() * 1000f);
+                                fraction = Math.max(0f, Math.min(1f, fraction));
+                                if (fraction > 0.03f && fraction < 0.97f) {
+                                    h.watchProgressBar.setVisibility(View.VISIBLE);
+                                    h.watchProgressBar.setScaleX(fraction);
+                                } else {
+                                    h.watchProgressBar.setVisibility(View.GONE);
+                                }
+                            } else {
+                                h.watchProgressBar.setVisibility(View.GONE);
+                            }
+                        },
+                        error -> h.watchProgressBar.setVisibility(View.GONE)
+                    );
+            } else {
+                h.watchProgressBar.setVisibility(View.GONE);
+            }
         }
     }
 
@@ -845,6 +886,8 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
 
         TextView status;
         ImageView icon;
+        ImageView thumbnail;
+        View watchProgressBar;
         TextView name;
         TextView size;
         TextView date;
@@ -877,6 +920,9 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
             status = itemView.findViewById(R.id.item_status);
             name = itemView.findViewById(R.id.item_name);
             icon = itemView.findViewById(R.id.item_icon);
+            thumbnail = itemView.findViewById(R.id.item_thumbnail);
+            watchProgressBar = itemView.findViewById(R.id.item_watch_progress);
+            watchProgressBar.setPivotX(0f);
             size = itemView.findViewById(R.id.item_size);
             date = itemView.findViewById(R.id.item_date);
 

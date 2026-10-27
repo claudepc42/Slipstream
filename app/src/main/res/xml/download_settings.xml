@@ -79,4 +79,11 @@
         app:singleLineTitle="false"
         app:iconSpaceReserved="false" />
 
+    <Preference
+        android:key="qr_presets_key"
+        android:title="@string/qr_preset_settings"
+        android:summary="@string/qr_preset_settings_summary"
+        app:singleLineTitle="false"
+        app:iconSpaceReserved="false" />
+
 </PreferenceScreen>

@@ -311,6 +311,9 @@ dependencies {
     // Date and time formatting
     implementation(libs.ocpsoft.prettytime)
 
+    // QR code scanning
+    implementation(libs.zxing.android.embedded)
+
     // Debugging and memory leak detection
     debugImplementation(libs.squareup.leakcanary.watcher)
     debugImplementation(libs.squareup.leakcanary.plumber)

@@ -905,4 +905,29 @@
     <string name="api23_requirement_dialog_title">NewPipe is dropping support for Android 5</string>
     <string name="api23_requirement_dialog_message">Unfortunately NewPipe depends on a few libraries that dropped support for Android 5.0 and 5.1. The next NewPipe release will therefore only work on devices with Android 6 or higher, sadly. Read more in the blogpost.</string>
     <string name="api23_requirement_dialog_blogpost">Blogpost</string>
+
+    <!-- QR Scanner -->
+    <string name="qr_scan_prompt">Scan a YouTube QR code</string>
+    <string name="qr_not_youtube_url">Not a valid YouTube URL</string>
+    <string name="qr_choose_preset">Download as…</string>
+    <string name="qr_presets_title">QR Download Presets</string>
+    <string name="qr_presets_description">Name your 3 quick-download presets. Tap any preset after scanning a QR code to start the download dialog.</string>
+    <string name="qr_preset_1_label">Preset 1</string>
+    <string name="qr_preset_2_label">Preset 2</string>
+    <string name="qr_preset_3_label">Preset 3</string>
+    <string name="qr_preset_settings">QR Download Presets</string>
+    <string name="qr_preset_settings_summary">Configure names for your 3 quick-download presets</string>
+
+    <!-- Folder Scanner -->
+    <string name="folder_scan_title">Scan Folder</string>
+    <string name="folder_scan_summary">Import already-downloaded files with YouTube metadata</string>
+    <string name="folder_scan_pick_folder">Choose a folder to scan</string>
+    <string name="folder_scan_scanning">Scanning…</string>
+    <string name="folder_scan_done">Scan complete: %1$d file(s) imported</string>
+    <string name="folder_scan_no_files">No media files found</string>
+    <string name="imported_files_header">Imported Files</string>
+
+    <!-- Misc -->
+    <string name="save">Save</string>
+    <string name="saved">Saved</string>
 </resources>
