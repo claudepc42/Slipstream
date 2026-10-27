@@ -13,6 +13,10 @@ captures/
 app/debug/
 app/release/
 
+# Local project docs — not for git
+CLAUDE.md
+SlipstreamPRD.md
+
 # vscode / eclipse files
 *.classpath
 *.project
