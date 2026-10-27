@@ -154,6 +154,12 @@
             android:label="@string/app_name"
             android:launchMode="singleTask" />
 
+        <activity
+            android:name=".player.LocalPlayerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:screenOrientation="sensorLandscape" />
+
         <service android:name="us.shandian.giga.service.DownloadManagerService"
             android:foregroundServiceType="dataSync" />
 

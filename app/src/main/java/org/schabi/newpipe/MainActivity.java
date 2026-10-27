@@ -677,6 +677,8 @@ public class MainActivity extends AppCompatActivity {
             }
             return false;
         });
+        // Visually pre-select Downloads to match the default screen opened in initFragments()
+        bottomNav.getMenu().findItem(R.id.nav_downloads).setChecked(true);
     }
 
     private void initFragments() {
@@ -690,7 +692,8 @@ public class MainActivity extends AppCompatActivity {
             }
             handleIntent(getIntent());
         } else {
-            openSearchAsHome();
+            // Downloads is the default home screen
+            NavigationHelper.openDownloads(this);
         }
     }
 

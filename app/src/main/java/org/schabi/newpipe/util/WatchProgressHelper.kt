@@ -11,12 +11,14 @@ import org.schabi.newpipe.NewPipeDatabase
 object WatchProgressHelper {
     private val YOUTUBE_ID_REGEX = Regex("[?&]v=([A-Za-z0-9_-]{11})")
     private val YOUTU_BE_REGEX = Regex("youtu\\.be/([A-Za-z0-9_-]{11})")
+    private val SHORTS_REGEX = Regex("/shorts/([A-Za-z0-9_-]{11})")
     private const val YOUTUBE_SERVICE_ID = 0
 
     fun extractYouTubeVideoId(url: String?): String? {
         if (url == null) return null
         return YOUTUBE_ID_REGEX.find(url)?.groupValues?.get(1)
             ?: YOUTU_BE_REGEX.find(url)?.groupValues?.get(1)
+            ?: SHORTS_REGEX.find(url)?.groupValues?.get(1)
     }
 
     fun thumbnailUrlForId(videoId: String): String {

@@ -68,6 +68,7 @@ import org.schabi.newpipe.streams.io.StoredFileHelper;
 import org.schabi.newpipe.util.Localization;
 import org.schabi.newpipe.util.NavigationHelper;
 import org.schabi.newpipe.util.WatchProgressHelper;
+import org.schabi.newpipe.player.LocalPlayerActivity;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -236,17 +237,18 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
             Date date = new Date(item.mission.timestamp);
             h.date.setText(dateFormat.format(date));
 
-            // Load thumbnail from YouTube CDN if we have a video ID.
-            // Try source URL first, fall back to extracting an ID from the filename.
+            // Load thumbnail: try filename first (most reliable for NewPipe downloads),
+            // then fall back to the source URL.
             final String source = item.mission.source;
-            String videoId = WatchProgressHelper.INSTANCE.extractYouTubeVideoId(source);
+            String videoId = extractYouTubeIdFromFilename(item.mission.storage.getName());
             if (videoId == null) {
-                videoId = extractYouTubeIdFromFilename(item.mission.storage.getName());
+                videoId = WatchProgressHelper.INSTANCE.extractYouTubeVideoId(source);
             }
             if (videoId != null) {
-                CoilHelper.INSTANCE.loadThumbnail(h.thumbnail, WatchProgressHelper.INSTANCE.thumbnailUrlForId(videoId));
+                CoilHelper.INSTANCE.loadThumbnail(h.thumbnail,
+                        WatchProgressHelper.INSTANCE.thumbnailUrlForId(videoId));
             } else {
-                h.thumbnail.setImageResource(android.R.drawable.ic_menu_gallery);
+                h.thumbnail.setImageResource(R.drawable.ic_movie);
             }
 
             // Load watch progress bar
@@ -390,6 +392,17 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
 
             if (h.lastSpeedIdx >= h.lastSpeed.length) h.lastSpeedIdx = 0;
         }
+    }
+
+    private void openInLocalPlayer(Mission mission) {
+        if (checkInvalidFile(mission)) return;
+        final Uri fileUri = resolveShareableUri(mission);
+        final Intent intent = new Intent(mContext, LocalPlayerActivity.class);
+        intent.setData(fileUri);
+        intent.putExtra(LocalPlayerActivity.EXTRA_TITLE, mission.storage.getName());
+        intent.addFlags(FLAG_ACTIVITY_NEW_TASK);
+        intent.addFlags(FLAG_GRANT_READ_URI_PERMISSION);
+        mContext.startActivity(intent);
     }
 
     private void viewWithFileProvider(Mission mission) {
@@ -957,13 +970,19 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
             itemView.setOnClickListener(v -> {
                 if (item.mission instanceof FinishedMission) {
                     final String src = item.mission.source;
-                    final String vid = WatchProgressHelper.INSTANCE.extractYouTubeVideoId(src);
+                    // Try filename first (NewPipe saves as "Title [videoId].ext")
+                    String vid = extractYouTubeIdFromFilename(item.mission.storage.getName());
+                    if (vid == null) {
+                        vid = WatchProgressHelper.INSTANCE.extractYouTubeVideoId(src);
+                    }
                     if (vid != null) {
-                        // Open in the built-in player via the YouTube URL
-                        NavigationHelper.openVideoDetail(mContext, 0, src,
+                        // YouTube video — open in built-in streaming player
+                        final String youtubeUrl = "https://www.youtube.com/watch?v=" + vid;
+                        NavigationHelper.openVideoDetail(mContext, 0, youtubeUrl,
                                 item.mission.storage.getName(), null, false);
                     } else {
-                        viewWithFileProvider(item.mission);
+                        // Non-YouTube file — open in local ExoPlayer, never the system chooser
+                        openInLocalPlayer(item.mission);
                     }
                 }
             });
