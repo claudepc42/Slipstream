@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import org.schabi.newpipe.NewPipeDatabase;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.database.imported.ImportedFileEntity;
+import org.schabi.newpipe.player.LocalPlayerActivity;
 import org.schabi.newpipe.util.WatchProgressHelper;
 import org.schabi.newpipe.util.image.CoilHelper;
 
@@ -89,10 +90,14 @@ public class ImportedFilesAdapter extends RecyclerView.Adapter<ImportedFilesAdap
         }
 
         holder.itemView.setOnClickListener(v -> {
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(Uri.parse(entity.getFileUri()), "*/*");
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            mContext.startActivity(Intent.createChooser(intent, entity.getTitle()));
+            Intent intent = new Intent(mContext, LocalPlayerActivity.class);
+            intent.setData(Uri.parse(entity.getFileUri()));
+            intent.putExtra(LocalPlayerActivity.EXTRA_TITLE, entity.getTitle());
+            if (entity.getVideoId() != null) {
+                intent.putExtra(LocalPlayerActivity.EXTRA_VIDEO_ID, entity.getVideoId());
+            }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            mContext.startActivity(intent);
         });
     }
 

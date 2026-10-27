@@ -18,21 +18,21 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.activity.result.contract.ActivityResultContracts;
-
 import org.schabi.newpipe.NewPipeDatabase;
-import org.schabi.newpipe.local.downloads.FolderScanManager;
 
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
 
 import us.shandian.giga.ui.adapter.ImportedFilesAdapter;
+import us.shandian.giga.ui.adapter.MissionAdapter;
 
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.view.ActionMode;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -54,7 +54,6 @@ import us.shandian.giga.get.DownloadMission;
 import us.shandian.giga.service.DownloadManager;
 import us.shandian.giga.service.DownloadManagerService;
 import us.shandian.giga.service.DownloadManagerService.DownloadManagerBinder;
-import us.shandian.giga.ui.adapter.MissionAdapter;
 
 public class MissionsFragment extends Fragment {
 
@@ -83,25 +82,35 @@ public class MissionsFragment extends Fragment {
     private final CompositeDisposable disposables = new CompositeDisposable();
 
     private DownloadMission unsafeMissionTarget = null;
+    private ActionMode mActionMode;
     private final ActivityResultLauncher<Intent> requestDownloadSaveAsLauncher =
             registerForActivityResult(new StartActivityForResult(), this::requestDownloadSaveAsResult);
-    private final ActivityResultLauncher<Uri> folderScanLauncher =
-            registerForActivityResult(new ActivityResultContracts.OpenDocumentTree(), uri -> {
-                if (uri == null) return;
-                requireContext().getContentResolver().takePersistableUriPermission(
-                        uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                Toast.makeText(mContext, R.string.folder_scan_scanning, Toast.LENGTH_SHORT).show();
-                disposables.add(
-                    FolderScanManager.INSTANCE.scanFolder(requireContext(), uri)
-                        .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe(
-                            count -> Toast.makeText(mContext,
-                                getString(R.string.folder_scan_done, count), Toast.LENGTH_LONG).show(),
-                            err -> Toast.makeText(mContext,
-                                err.getMessage(), Toast.LENGTH_LONG).show()
-                        )
-                );
-            });
+
+    private final ActionMode.Callback mActionModeCallback = new ActionMode.Callback() {
+        @Override
+        public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+            mode.getMenuInflater().inflate(R.menu.missions_select, menu);
+            return true;
+        }
+        @Override
+        public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+            return false;
+        }
+        @Override
+        public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
+            if (item.getItemId() == R.id.delete_selected) {
+                if (mAdapter != null) mAdapter.deleteSelected();
+                mode.finish();
+                return true;
+            }
+            return false;
+        }
+        @Override
+        public void onDestroyActionMode(ActionMode mode) {
+            mActionMode = null;
+            if (mAdapter != null) mAdapter.exitSelectionMode();
+        }
+    };
     private final ServiceConnection mConnection = new ServiceConnection() {
 
         @Override
@@ -113,12 +122,26 @@ public class MissionsFragment extends Fragment {
 
             mAdapter.setRecover(MissionsFragment.this::recoverMission);
 
+            mAdapter.setSelectionListener((inSelectionMode, count) -> {
+                if (inSelectionMode && mActionMode == null) {
+                    mActionMode = ((AppCompatActivity) mContext).startSupportActionMode(mActionModeCallback);
+                }
+                if (mActionMode != null) {
+                    if (!inSelectionMode) {
+                        mActionMode.finish();
+                    } else {
+                        mActionMode.setTitle(count + " selected");
+                    }
+                }
+            });
+
             setAdapterButtons();
 
             mBinder.addMissionEventListener(mAdapter);
             mBinder.enableNotifications(false);
 
             updateList();
+            mAdapter.cleanGhostEntries();
         }
 
         @Override
@@ -212,6 +235,10 @@ public class MissionsFragment extends Fragment {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        if (mActionMode != null) {
+            mActionMode.finish();
+            mActionMode = null;
+        }
         disposables.clear();
         if (mImportedAdapter != null) {
             mImportedAdapter.onDestroy();
@@ -254,9 +281,6 @@ public class MissionsFragment extends Fragment {
             mAdapter.refreshMissionItems();// update items view
 
             return super.onOptionsItemSelected(item);
-        } else if (itemId == R.id.scan_folder) {
-            folderScanLauncher.launch(null);
-            return true;
         }
         return super.onOptionsItemSelected(item);
     }

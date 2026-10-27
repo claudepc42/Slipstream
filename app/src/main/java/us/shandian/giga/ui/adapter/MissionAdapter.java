@@ -79,9 +79,12 @@ import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.text.DateFormat;
 
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
@@ -127,6 +130,18 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
     private Snackbar mSnackbar;
 
     private final CompositeDisposable compositeDisposable = new CompositeDisposable();
+
+    private boolean mSelectionMode = false;
+    private final Set<Integer> mSelectedPositions = new HashSet<>();
+    private SelectionListener mSelectionListener;
+
+    public interface SelectionListener {
+        void onSelectionChanged(boolean inSelectionMode, int count);
+    }
+
+    public void setSelectionListener(SelectionListener listener) {
+        mSelectionListener = listener;
+    }
 
     public MissionAdapter(Context context, @NonNull DownloadManager downloadManager, View emptyMessage, View root) {
         mContext = context;
@@ -232,6 +247,16 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
             h.status.setText("100%");
             h.progress.setProgress(0.0f); // no colored fill behind thumbnail
             h.size.setText(Utility.formatBytes(item.mission.length));
+
+            // Selection mode highlight
+            if (mSelectionMode && mSelectedPositions.contains(pos)) {
+                h.progressOverlay.setVisibility(View.VISIBLE);
+                h.progressOverlay.setAlpha(0.55f);
+                h.progressOverlay.setBackgroundColor(0x440088FF);
+            } else {
+                h.progressOverlay.setVisibility(View.GONE);
+                h.progressOverlay.setAlpha(0.0f);
+            }
 
             DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.getDefault());
             Date date = new Date(item.mission.timestamp);
@@ -861,6 +886,76 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
         }
     }
 
+    public void enterSelectionMode(int pos) {
+        mSelectionMode = true;
+        mSelectedPositions.add(pos);
+        notifyDataSetChanged();
+        if (mSelectionListener != null) {
+            mSelectionListener.onSelectionChanged(true, mSelectedPositions.size());
+        }
+    }
+
+    public void exitSelectionMode() {
+        mSelectionMode = false;
+        mSelectedPositions.clear();
+        notifyDataSetChanged();
+        if (mSelectionListener != null) {
+            mSelectionListener.onSelectionChanged(false, 0);
+        }
+    }
+
+    public boolean isInSelectionMode() {
+        return mSelectionMode;
+    }
+
+    private void toggleSelection(int pos) {
+        if (mSelectedPositions.contains(pos)) {
+            mSelectedPositions.remove(pos);
+        } else {
+            mSelectedPositions.add(pos);
+        }
+        notifyItemChanged(pos);
+        if (mSelectedPositions.isEmpty()) {
+            exitSelectionMode();
+        } else if (mSelectionListener != null) {
+            mSelectionListener.onSelectionChanged(true, mSelectedPositions.size());
+        }
+    }
+
+    public void deleteSelected() {
+        List<Mission> toDelete = new ArrayList<>();
+        for (int pos : mSelectedPositions) {
+            DownloadManager.MissionItem item = mIterator.getItem(pos);
+            if (item != null && item.mission != null) {
+                toDelete.add(item.mission);
+            }
+        }
+        mSelectedPositions.clear();
+        mSelectionMode = false;
+        for (Mission m : toDelete) {
+            mDeleter.append(m, true);
+        }
+        applyChanges();
+        checkMasterButtonsVisibility();
+    }
+
+    public void cleanGhostEntries() {
+        List<Mission> ghosts = new ArrayList<>();
+        for (int i = 0; i < mIterator.getOldListSize(); i++) {
+            DownloadManager.MissionItem item = mIterator.getItem(i);
+            if (item.special != DownloadManager.SPECIAL_NOTHING) continue;
+            if (item.mission instanceof FinishedMission && !item.mission.storage.existsAsFile()) {
+                ghosts.add(item.mission);
+            }
+        }
+        if (!ghosts.isEmpty()) {
+            for (Mission m : ghosts) {
+                mDownloadManager.deleteMission(m, false);
+            }
+            applyChanges();
+        }
+    }
+
     public void onDestroy() {
         compositeDisposable.dispose();
         mDeleter.dispose();
@@ -917,6 +1012,7 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
         ImageView icon;
         ImageView thumbnail;
         View watchProgressBar;
+        View progressOverlay;
         TextView name;
         TextView size;
         TextView date;
@@ -952,6 +1048,7 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
             thumbnail = itemView.findViewById(R.id.item_thumbnail);
             watchProgressBar = itemView.findViewById(R.id.item_watch_progress);
             watchProgressBar.setPivotX(0f);
+            progressOverlay = itemView.findViewById(R.id.item_progress_overlay);
             size = itemView.findViewById(R.id.item_size);
             date = itemView.findViewById(R.id.item_date);
 
@@ -976,15 +1073,23 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
             itemView.setHapticFeedbackEnabled(true);
 
             itemView.setOnClickListener(v -> {
-                if (item.mission instanceof FinishedMission) {
-                    // Always play the local file — never stream from YouTube for a download.
-                    // The video ID (if found) is passed only for progress-tracking metadata.
+                if (mSelectionMode) {
+                    int pos = getBindingAdapterPosition();
+                    if (pos != RecyclerView.NO_ID) toggleSelection(pos);
+                } else if (item.mission instanceof FinishedMission) {
                     openInLocalPlayer(item.mission);
                 }
             });
 
             itemView.setOnLongClickListener(v -> {
                 v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                if (!mSelectionMode && item.mission instanceof FinishedMission) {
+                    int pos = getBindingAdapterPosition();
+                    if (pos != RecyclerView.NO_ID) {
+                        enterSelectionMode(pos);
+                        return true;
+                    }
+                }
                 showPopupMenu();
                 return true;
             });
