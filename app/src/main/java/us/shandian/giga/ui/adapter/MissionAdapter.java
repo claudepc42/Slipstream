@@ -44,6 +44,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.NotificationCompat;
@@ -67,6 +68,9 @@ import org.schabi.newpipe.streams.io.StoredFileHelper;
 import org.schabi.newpipe.util.Localization;
 import org.schabi.newpipe.util.NavigationHelper;
 import org.schabi.newpipe.util.WatchProgressHelper;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.schabi.newpipe.util.image.CoilHelper;
 import org.schabi.newpipe.util.external_communication.ShareUtils;
 
@@ -232,9 +236,13 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
             Date date = new Date(item.mission.timestamp);
             h.date.setText(dateFormat.format(date));
 
-            // Load thumbnail from YouTube CDN if we have a video ID
+            // Load thumbnail from YouTube CDN if we have a video ID.
+            // Try source URL first, fall back to extracting an ID from the filename.
             final String source = item.mission.source;
-            final String videoId = WatchProgressHelper.INSTANCE.extractYouTubeVideoId(source);
+            String videoId = WatchProgressHelper.INSTANCE.extractYouTubeVideoId(source);
+            if (videoId == null) {
+                videoId = extractYouTubeIdFromFilename(item.mission.storage.getName());
+            }
             if (videoId != null) {
                 CoilHelper.INSTANCE.loadThumbnail(h.thumbnail, WatchProgressHelper.INSTANCE.thumbnailUrlForId(videoId));
             } else {
@@ -947,8 +955,17 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
             itemView.setHapticFeedbackEnabled(true);
 
             itemView.setOnClickListener(v -> {
-                if (item.mission instanceof FinishedMission)
-                    viewWithFileProvider(item.mission);
+                if (item.mission instanceof FinishedMission) {
+                    final String src = item.mission.source;
+                    final String vid = WatchProgressHelper.INSTANCE.extractYouTubeVideoId(src);
+                    if (vid != null) {
+                        // Open in the built-in player via the YouTube URL
+                        NavigationHelper.openVideoDetail(mContext, 0, src,
+                                item.mission.storage.getName(), null, false);
+                    } else {
+                        viewWithFileProvider(item.mission);
+                    }
+                }
             });
 
             itemView.setOnLongClickListener(v -> {
@@ -1038,6 +1055,24 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
             super(view);
             header = itemView.findViewById(R.id.item_name);
         }
+    }
+
+    /**
+     * Extracts a YouTube video ID from a filename.
+     * Prefers [ID] or (ID) bracketed forms; falls back to any 11-char alphanumeric run.
+     */
+    private static final Pattern YT_ID_BRACKET = Pattern.compile("[\\[(]([A-Za-z0-9_\\-]{11})[\\])]");
+    private static final Pattern YT_ID_BARE = Pattern.compile("(?<![A-Za-z0-9_\\-])([A-Za-z0-9_\\-]{11})(?![A-Za-z0-9_\\-])");
+
+    @Nullable
+    private static String extractYouTubeIdFromFilename(@Nullable String filename) {
+        if (filename == null || filename.isEmpty()) return null;
+        Matcher m = YT_ID_BRACKET.matcher(filename);
+        if (m.find()) return m.group(1);
+        // Bare match: skip common short words that happen to be 11 chars
+        Matcher m2 = YT_ID_BARE.matcher(filename.replaceAll("\\.[^.]+$", ""));
+        if (m2.find()) return m2.group(1);
+        return null;
     }
 
     public interface RecoverHelper {
