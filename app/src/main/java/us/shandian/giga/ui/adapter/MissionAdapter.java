@@ -400,6 +400,14 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
         final Intent intent = new Intent(mContext, LocalPlayerActivity.class);
         intent.setData(fileUri);
         intent.putExtra(LocalPlayerActivity.EXTRA_TITLE, mission.storage.getName());
+        // Pass video ID if known, so the local player can key progress by it
+        String vid = extractYouTubeIdFromFilename(mission.storage.getName());
+        if (vid == null) {
+            vid = WatchProgressHelper.INSTANCE.extractYouTubeVideoId(mission.source);
+        }
+        if (vid != null) {
+            intent.putExtra(LocalPlayerActivity.EXTRA_VIDEO_ID, vid);
+        }
         intent.addFlags(FLAG_ACTIVITY_NEW_TASK);
         intent.addFlags(FLAG_GRANT_READ_URI_PERMISSION);
         mContext.startActivity(intent);
@@ -969,21 +977,9 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
 
             itemView.setOnClickListener(v -> {
                 if (item.mission instanceof FinishedMission) {
-                    final String src = item.mission.source;
-                    // Try filename first (NewPipe saves as "Title [videoId].ext")
-                    String vid = extractYouTubeIdFromFilename(item.mission.storage.getName());
-                    if (vid == null) {
-                        vid = WatchProgressHelper.INSTANCE.extractYouTubeVideoId(src);
-                    }
-                    if (vid != null) {
-                        // YouTube video — open in built-in streaming player
-                        final String youtubeUrl = "https://www.youtube.com/watch?v=" + vid;
-                        NavigationHelper.openVideoDetail(mContext, 0, youtubeUrl,
-                                item.mission.storage.getName(), null, false);
-                    } else {
-                        // Non-YouTube file — open in local ExoPlayer, never the system chooser
-                        openInLocalPlayer(item.mission);
-                    }
+                    // Always play the local file — never stream from YouTube for a download.
+                    // The video ID (if found) is passed only for progress-tracking metadata.
+                    openInLocalPlayer(item.mission);
                 }
             });
 

@@ -21,6 +21,7 @@ class LocalPlayerActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_TITLE = "local_player_title"
+        const val EXTRA_VIDEO_ID = "local_player_video_id"
         private const val PREFS_PREFIX = "local_player_progress_"
     }
 
@@ -28,6 +29,7 @@ class LocalPlayerActivity : AppCompatActivity() {
     private lateinit var playerView: StyledPlayerView
     private lateinit var prefs: SharedPreferences
     private var fileUri: Uri? = null
+    private var progressKey: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,10 +41,15 @@ class LocalPlayerActivity : AppCompatActivity() {
 
         fileUri = intent.data
         val title = intent.getStringExtra(EXTRA_TITLE)
+        val videoId = intent.getStringExtra(EXTRA_VIDEO_ID)
+
+        // Key progress by video ID when available, otherwise by file URI
+        progressKey = if (videoId != null) PREFS_PREFIX + videoId
+                      else PREFS_PREFIX + fileUri.toString().hashCode()
+
         if (!title.isNullOrEmpty()) {
             supportActionBar?.title = title
         }
-
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
         if (fileUri != null) {
@@ -59,7 +66,8 @@ class LocalPlayerActivity : AppCompatActivity() {
             exo.setMediaItem(MediaItem.fromUri(uri))
             exo.prepare()
 
-            val saved = prefs.getLong(prefKey(uri), 0L)
+            val key = progressKey ?: return@also
+            val saved = prefs.getLong(key, 0L)
             if (saved > 0L) {
                 exo.seekTo(saved)
             }
@@ -68,14 +76,12 @@ class LocalPlayerActivity : AppCompatActivity() {
     }
 
     private fun saveProgress() {
-        val uri = fileUri ?: return
+        val key = progressKey ?: return
         val exo = player ?: return
         if (exo.duration > 0 && exo.currentPosition > 0) {
-            prefs.edit().putLong(prefKey(uri), exo.currentPosition).apply()
+            prefs.edit().putLong(key, exo.currentPosition).apply()
         }
     }
-
-    private fun prefKey(uri: Uri) = PREFS_PREFIX + uri.toString().hashCode()
 
     override fun onPause() {
         super.onPause()

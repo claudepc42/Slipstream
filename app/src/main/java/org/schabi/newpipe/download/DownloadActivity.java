@@ -8,6 +8,7 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.ViewTreeObserver;
+import android.widget.Toast;
 
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
@@ -19,6 +20,7 @@ import androidx.preference.PreferenceManager;
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.databinding.ActivityDownloaderBinding;
+import org.schabi.newpipe.local.downloads.FolderScanManager;
 import org.schabi.newpipe.qr.QrScanActivity;
 import org.schabi.newpipe.streams.io.NoFileManagerSafeGuard;
 import org.schabi.newpipe.streams.io.StoredDirectoryHelper;
@@ -28,6 +30,8 @@ import org.schabi.newpipe.views.FocusOverlayView;
 
 import java.io.IOException;
 
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import us.shandian.giga.service.DownloadManagerService;
 import us.shandian.giga.ui.fragment.MissionsFragment;
 
@@ -36,8 +40,13 @@ public class DownloadActivity extends AppCompatActivity {
     private static final String TAG = "DownloadActivity";
     private static final String MISSIONS_FRAGMENT_TAG = "fragment_tag";
 
+    private final CompositeDisposable disposables = new CompositeDisposable();
+
     private final ActivityResultLauncher<Intent> pickFolderLauncher =
             registerForActivityResult(new StartActivityForResult(), this::onFolderPicked);
+
+    private final ActivityResultLauncher<Intent> scanFolderLauncher =
+            registerForActivityResult(new StartActivityForResult(), this::onScanFolderPicked);
 
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
@@ -144,12 +153,51 @@ public class DownloadActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(final MenuItem item) {
-        switch (item.getItemId()) {
-            case android.R.id.home:
-                onBackPressed();
-                return true;
-            default:
-                return super.onOptionsItemSelected(item);
+        final int id = item.getItemId();
+        if (id == android.R.id.home) {
+            onBackPressed();
+            return true;
+        } else if (id == R.id.scan_folder) {
+            NoFileManagerSafeGuard.launchSafe(
+                    scanFolderLauncher,
+                    StoredDirectoryHelper.getPicker(this),
+                    TAG,
+                    this
+            );
+            return true;
         }
+        return super.onOptionsItemSelected(item);
+    }
+
+    private void onScanFolderPicked(final ActivityResult result) {
+        if (result.getResultCode() != RESULT_OK || result.getData() == null) {
+            return;
+        }
+        final Uri uri = result.getData().getData();
+        if (uri == null) {
+            return;
+        }
+        Toast.makeText(this, R.string.folder_scan_scanning, Toast.LENGTH_SHORT).show();
+        disposables.add(
+            FolderScanManager.INSTANCE.scanFolder(this, uri)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                    scanResult -> {
+                        final String msg = getString(R.string.folder_scan_result,
+                                scanResult.getTotal(), scanResult.getWithYouTubeId());
+                        Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+                    },
+                    err -> {
+                        Log.e(TAG, "Folder scan failed", err);
+                        Toast.makeText(this, R.string.folder_scan_failed, Toast.LENGTH_SHORT).show();
+                    }
+                )
+        );
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        disposables.clear();
     }
 }

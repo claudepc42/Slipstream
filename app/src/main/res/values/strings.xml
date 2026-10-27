@@ -922,9 +922,11 @@
     <string name="folder_scan_title">Scan Folder</string>
     <string name="folder_scan_summary">Import already-downloaded files with YouTube metadata</string>
     <string name="folder_scan_pick_folder">Choose a folder to scan</string>
-    <string name="folder_scan_scanning">Scanning…</string>
+    <string name="folder_scan_scanning">Scanning folder…</string>
     <string name="folder_scan_done">Scan complete: %1$d file(s) imported</string>
     <string name="folder_scan_no_files">No media files found</string>
+    <string name="folder_scan_result">Found %1$d video files (%2$d with YouTube ID)</string>
+    <string name="folder_scan_failed">Folder scan failed</string>
     <string name="imported_files_header">Imported Files</string>
 
     <!-- Misc -->
