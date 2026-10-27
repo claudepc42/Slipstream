@@ -93,6 +93,14 @@
             android:label="@string/qr_scan_prompt" />
 
         <activity
+            android:name=".qr.PortraitCaptureActivity"
+            android:exported="false"
+            android:screenOrientation="sensorPortrait"
+            android:stateNotNeeded="true"
+            android:theme="@style/zxing_CaptureTheme"
+            android:windowSoftInputMode="stateAlwaysHidden" />
+
+        <activity
             android:name=".qr.QrPresetsActivity"
             android:exported="false"
             android:label="@string/qr_presets_title" />

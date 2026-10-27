@@ -486,7 +486,7 @@
 
     <!-- Preferred action on open (open from external app) -->
     <string name="preferred_open_action_key">preferred_open_action_key</string>
-    <string name="preferred_open_action_default">@string/always_ask_open_action_key</string>
+    <string name="preferred_open_action_default">@string/video_player_key</string>
     <string name="preferred_open_action_last_selected_key">preferred_open_action_last_selected</string>
 
     <string name="show_info_key">show_info</string>

@@ -46,7 +46,8 @@ class QrScanActivity : AppCompatActivity() {
         val options = ScanOptions().apply {
             setPrompt(getString(R.string.qr_scan_prompt))
             setBeepEnabled(true)
-            setOrientationLocked(true)
+            setOrientationLocked(false)
+            setCaptureActivity(PortraitCaptureActivity::class.java)
         }
         scanLauncher.launch(options)
     }
