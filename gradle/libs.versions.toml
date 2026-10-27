@@ -80,6 +80,8 @@ viewpager2 = "1.1.0"
 webkit = "1.15.0" # New versions require minSdk 24
 work = "2.11.2" # New versions require minSdk 24
 zxing-android-embedded = "4.3.0"
+cast-framework = "21.5.0"
+nanohttpd = "2.3.1"
 
 [libraries]
 acra-core = { module = "ch.acra:acra-core", version.ref = "acra" }
@@ -129,7 +131,11 @@ google-exoplayer-datasource = { module = "com.google.android.exoplayer:exoplayer
 google-exoplayer-hls = { module = "com.google.android.exoplayer:exoplayer-hls", version.ref = "exoplayer" }
 google-exoplayer-mediasession = { module = "com.google.android.exoplayer:extension-mediasession", version.ref = "exoplayer" }
 google-exoplayer-smoothstreaming = { module = "com.google.android.exoplayer:exoplayer-smoothstreaming", version.ref = "exoplayer" }
+google-exoplayer-cast = { module = "com.google.android.exoplayer:extension-cast", version.ref = "exoplayer" }
 google-exoplayer-ui = { module = "com.google.android.exoplayer:exoplayer-ui", version.ref = "exoplayer" }
+google-cast-framework = { module = "com.google.android.gms:play-services-cast-framework", version.ref = "cast-framework" }
+google-mediarouter = { module = "androidx.mediarouter:mediarouter", version = "1.7.0" }
+nanohttpd = { module = "org.nanohttpd:nanohttpd", version.ref = "nanohttpd" }
 jakewharton-phoenix = { module = "com.jakewharton:process-phoenix", version.ref = "phoenix" }
 jakewharton-rxbinding = { module = "com.jakewharton.rxbinding4:rxbinding", version.ref = "rxbinding" }
 jetbrains-compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "multiplatform" }

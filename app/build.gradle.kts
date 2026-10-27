@@ -32,6 +32,15 @@ kotlin {
 }
 
 configure<ApplicationExtension> {
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file("slipstream.jks")
+            storePassword = "slipstream123"
+            keyAlias = "slipstream"
+            keyPassword = "slipstream123"
+        }
+    }
+
     compileSdk {
         version = release(NEWPIPE_VERSION_SDK_COMPILE_MAJOR) {
             minorApiLevel = NEWPIPE_VERSION_SDK_COMPILE_MINOR
@@ -72,10 +81,8 @@ configure<ApplicationExtension> {
         }
 
         release {
-            System.getProperty("packageSuffix")?.let { suffix ->
-                applicationIdSuffix = suffix
-                resValue("string", "app_name", "Slipstream $suffix")
-            }
+            signingConfig = signingConfigs.getByName("release")
+            resValue("string", "app_name", "Slipstream")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -313,6 +320,12 @@ dependencies {
 
     // QR code scanning
     implementation(libs.zxing.android.embedded)
+
+    // Chromecast
+    implementation(libs.google.cast.framework)
+    implementation(libs.google.exoplayer.cast)
+    implementation(libs.google.mediarouter)
+    implementation(libs.nanohttpd)
 
     // Debugging and memory leak detection
     debugImplementation(libs.squareup.leakcanary.watcher)

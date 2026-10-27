@@ -39,6 +39,11 @@
         android:theme="@style/OpeningTheme"
         android:memtagMode="async"
         tools:ignore="AllowBackup">
+
+        <!-- Chromecast Cast SDK -->
+        <meta-data
+            android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
+            android:value="org.schabi.newpipe.cast.CastOptionsProvider" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -157,8 +162,8 @@
         <activity
             android:name=".player.LocalPlayerActivity"
             android:exported="false"
-            android:configChanges="orientation|screenSize|keyboardHidden"
-            android:screenOrientation="sensorLandscape" />
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:screenOrientation="fullSensor" />
 
         <service android:name="us.shandian.giga.service.DownloadManagerService"
             android:foregroundServiceType="dataSync" />

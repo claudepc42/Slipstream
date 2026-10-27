@@ -929,6 +929,9 @@
     <string name="folder_scan_failed">Folder scan failed</string>
     <string name="imported_files_header">Imported Files</string>
 
+    <!-- Chromecast -->
+    <string name="cast">Cast</string>
+
     <!-- Misc -->
     <string name="save">Save</string>
     <string name="saved">Saved</string>
