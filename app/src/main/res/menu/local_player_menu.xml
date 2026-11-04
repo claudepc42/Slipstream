@@ -3,9 +3,15 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
-        android:id="@+id/media_route_menu_item"
-        android:title="@string/cast"
-        app:actionProviderClass="androidx.mediarouter.app.MediaRouteActionProvider"
+        android:id="@+id/pip_button"
+        android:title="Pop out"
+        android:icon="@drawable/ic_picture_in_picture"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/airplay_button"
+        android:title="AirPlay"
+        android:icon="@drawable/ic_cast"
         app:showAsAction="always" />
 
 </menu>

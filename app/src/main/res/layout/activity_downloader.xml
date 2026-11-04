@@ -28,6 +28,7 @@
         android:layout_margin="16dp"
         android:contentDescription="Scan QR code to download"
         android:src="@drawable/ic_qr_code_scanner"
+        app:backgroundTint="#B71C1C"
         app:tint="@android:color/white" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

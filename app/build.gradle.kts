@@ -321,10 +321,6 @@ dependencies {
     // QR code scanning
     implementation(libs.zxing.android.embedded)
 
-    // Chromecast
-    implementation(libs.google.cast.framework)
-    implementation(libs.google.exoplayer.cast)
-    implementation(libs.google.mediarouter)
     implementation(libs.nanohttpd)
 
     // Debugging and memory leak detection

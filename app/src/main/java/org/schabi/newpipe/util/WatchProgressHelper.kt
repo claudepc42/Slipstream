@@ -1,18 +1,21 @@
 package org.schabi.newpipe.util
 
 import android.content.Context
+import androidx.preference.PreferenceManager
 import io.reactivex.rxjava3.core.Maybe
 import io.reactivex.rxjava3.schedulers.Schedulers
-import org.schabi.newpipe.NewPipeDatabase
 
 /**
- * Returns (progressMillis, durationSeconds) for a YouTube video URL, or null if unknown.
+ * Returns (progressMillis, durationSeconds) for a video, or null if unknown.
+ * Reads from SharedPreferences written by LocalPlayerActivity.
  */
 object WatchProgressHelper {
     private val YOUTUBE_ID_REGEX = Regex("[?&]v=([A-Za-z0-9_-]{11})")
     private val YOUTU_BE_REGEX = Regex("youtu\\.be/([A-Za-z0-9_-]{11})")
     private val SHORTS_REGEX = Regex("/shorts/([A-Za-z0-9_-]{11})")
-    private const val YOUTUBE_SERVICE_ID = 0
+
+    const val PREFS_POSITION_PREFIX = "local_player_progress_"
+    const val PREFS_DURATION_PREFIX = "local_player_duration_"
 
     fun extractYouTubeVideoId(url: String?): String? {
         if (url == null) return null
@@ -25,18 +28,17 @@ object WatchProgressHelper {
         return "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
     }
 
-    /** Returns (progressMillis, durationSeconds) or null. Runs on IO scheduler. */
-    fun loadProgress(context: Context, url: String): Maybe<Pair<Long, Long>> {
+    /**
+     * Returns (progressMillis, durationMillis) from SharedPreferences keyed by videoId,
+     * or null if no progress has been recorded yet. Runs on IO scheduler.
+     */
+    fun loadProgress(context: Context, videoId: String): Maybe<Pair<Long, Long>> {
         return Maybe.fromCallable {
-            val db = NewPipeDatabase.getInstance(context)
-            val streams = db.streamDAO()
-                .getStream(YOUTUBE_SERVICE_ID.toLong(), url)
-                .blockingFirst()
-            val stream = streams.firstOrNull() ?: return@fromCallable null
-            val states = db.streamStateDAO().getState(stream.uid).blockingFirst()
-            val state = states.firstOrNull() ?: return@fromCallable null
-            if (stream.duration <= 0) return@fromCallable null
-            Pair(state.progressMillis, stream.duration)
+            val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+            val position = prefs.getLong(PREFS_POSITION_PREFIX + videoId, 0L)
+            val duration = prefs.getLong(PREFS_DURATION_PREFIX + videoId, 0L)
+            if (position <= 0L || duration <= 0L) return@fromCallable null
+            Pair(position, duration)
         }.subscribeOn(Schedulers.io())
     }
 }

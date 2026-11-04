@@ -297,7 +297,10 @@ public class RouterActivity extends AppCompatActivity {
     }
 
     protected void onSuccess() {
-        if (getIntent().getBooleanExtra(EXTRA_FORCE_DOWNLOAD, false)) {
+        // For Slipstream: a shared stream URL always goes straight to the download dialog.
+        // Only show the choice picker for non-stream links (playlists, channels).
+        if (currentLinkType == LinkType.STREAM
+                || getIntent().getBooleanExtra(EXTRA_FORCE_DOWNLOAD, false)) {
             handleChoice(getString(R.string.download_key));
             return;
         }

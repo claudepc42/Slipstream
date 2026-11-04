@@ -70,6 +70,7 @@ import org.schabi.newpipe.util.SecondaryStreamHelper;
 import org.schabi.newpipe.util.SimpleOnSeekBarChangeListener;
 import org.schabi.newpipe.util.StreamItemAdapter;
 import org.schabi.newpipe.util.StreamItemAdapter.StreamInfoWrapper;
+import org.schabi.newpipe.util.SubtitleHelper;
 import org.schabi.newpipe.util.ThemeHelper;
 
 import java.io.File;
@@ -109,6 +110,8 @@ public class DownloadDialog extends DialogFragment
     int selectedAudioIndex = 0; // default to the first item
     @State
     int selectedSubtitleIndex = 0; // default to the first item
+    @State
+    int selectedCompanionSubtitleIndex = 0;
 
     private StoredDirectoryHelper mainStorageAudio = null;
     private StoredDirectoryHelper mainStorageVideo = null;
@@ -432,6 +435,7 @@ public class DownloadDialog extends DialogFragment
         dialogBinding.audioTrackSpinner.setVisibility(
                 wrappedAudioTracks.size() > 1 ? View.VISIBLE : View.GONE);
         dialogBinding.audioTrackPresentInVideoText.setVisibility(View.GONE);
+        dialogBinding.downloadCaptionsLayout.setVisibility(View.GONE);
     }
 
     private void setupVideoSpinner() {
@@ -445,6 +449,29 @@ public class DownloadDialog extends DialogFragment
         setRadioButtonsState(true);
         dialogBinding.audioStreamSpinner.setVisibility(View.GONE);
         onVideoStreamSelected();
+
+        // Show "Also download captions" row if subtitles are available
+        if (subtitleStreamsAdapter.getCount() > 0) {
+            dialogBinding.downloadCaptionsLayout.setVisibility(View.VISIBLE);
+            dialogBinding.captionsLanguageSpinner.setAdapter(subtitleStreamsAdapter);
+            dialogBinding.captionsLanguageSpinner.setSelection(selectedCompanionSubtitleIndex);
+            dialogBinding.downloadCaptionsCheckbox.setOnCheckedChangeListener(
+                    (btn, checked) -> dialogBinding.captionsLanguageSpinner.setVisibility(
+                            checked ? View.VISIBLE : View.GONE));
+            // keep spinner selection in sync
+            dialogBinding.captionsLanguageSpinner.setOnItemSelectedListener(
+                    new AdapterView.OnItemSelectedListener() {
+                        @Override
+                        public void onItemSelected(final AdapterView<?> p,
+                                                   final View v, final int pos, final long id) {
+                            selectedCompanionSubtitleIndex = pos;
+                        }
+                        @Override
+                        public void onNothingSelected(final AdapterView<?> p) { }
+                    });
+        } else {
+            dialogBinding.downloadCaptionsLayout.setVisibility(View.GONE);
+        }
     }
 
     private void onVideoStreamSelected() {
@@ -468,6 +495,7 @@ public class DownloadDialog extends DialogFragment
         dialogBinding.audioStreamSpinner.setVisibility(View.GONE);
         dialogBinding.audioTrackSpinner.setVisibility(View.GONE);
         dialogBinding.audioTrackPresentInVideoText.setVisibility(View.GONE);
+        dialogBinding.downloadCaptionsLayout.setVisibility(View.GONE);
     }
 
 
@@ -1016,6 +1044,51 @@ public class DownloadDialog extends DialogFragment
         askDialog.show();
     }
 
+    private void downloadCompanionSubtitle() {
+        if (wrappedSubtitleStreams.getStreamsList().isEmpty()) return;
+        final int idx = selectedCompanionSubtitleIndex;
+        if (idx < 0 || idx >= wrappedSubtitleStreams.getStreamsList().size()) return;
+
+        final SubtitlesStream stream = subtitleStreamsAdapter.getItem(idx);
+        final String baseName = FilenameUtils.createFilename(context, currentInfo.getName());
+        final String langCode = stream.getLanguageTag();
+        final MediaFormat fmt = stream.getFormat();
+
+        final String ext;
+        final String mime;
+        String psName = null;
+        String[] psArgs = null;
+
+        if (fmt == MediaFormat.TTML) {
+            ext = MediaFormat.SRT.getSuffix();
+            mime = MediaFormat.SRT.mimeType;
+            psName = Postprocessing.ALGORITHM_TTML_CONVERTER;
+            psArgs = new String[]{fmt.getSuffix(), "false"};
+        } else if (fmt != null) {
+            ext = fmt.getSuffix();
+            mime = fmt.mimeType;
+        } else {
+            ext = "vtt";
+            mime = "text/vtt";
+        }
+
+        final String captionFilename = getString(R.string.caption_file_name, baseName, langCode)
+                + "." + ext;
+
+        if (mainStorageVideo == null || !mainStorageVideo.mkdirs()) return;
+
+        StoredFileHelper captionStorage = mainStorageVideo.createFile(captionFilename, mime);
+        if (captionStorage == null || !captionStorage.canWrite()) return;
+
+        DownloadManagerService.startMission(context,
+                new String[]{stream.getContent()}, captionStorage, 's', 1,
+                currentInfo, psName, psArgs, 0,
+                new ArrayList<>(List.of(new MissionRecoveryInfo(stream))));
+
+        SubtitleHelper.INSTANCE.storeSubtitleUri(context, currentInfo.getId(),
+                captionStorage.getUri());
+    }
+
     private void continueSelectedDownload(@NonNull final StoredFileHelper storage) {
         if (!storage.canWrite()) {
             showFailedDialog(R.string.permission_denied);
@@ -1118,6 +1191,12 @@ public class DownloadDialog extends DialogFragment
 
         DownloadManagerService.startMission(context, urls, storage, kind, threads,
                 currentInfo, psName, psArgs, nearLength, new ArrayList<>(recoveryInfo));
+
+        // If the user asked to download captions alongside a video, queue that too
+        if (checkedRadioButtonId == R.id.video_button
+                && dialogBinding.downloadCaptionsCheckbox.isChecked()) {
+            downloadCompanionSubtitle();
+        }
 
         Toast.makeText(context, getString(R.string.download_has_started),
                 Toast.LENGTH_SHORT).show();

@@ -162,6 +162,7 @@
         <activity
             android:name=".player.LocalPlayerActivity"
             android:exported="false"
+            android:supportsPictureInPicture="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:screenOrientation="fullSensor" />
 

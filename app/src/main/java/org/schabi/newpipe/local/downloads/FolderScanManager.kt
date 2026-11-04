@@ -27,9 +27,11 @@ object FolderScanManager {
             for (file in files) {
                 val name = file.name ?: continue
                 val videoId = extractYouTubeId(name)
-                val thumbnailUrl = if (videoId != null)
+                val thumbnailUrl = if (videoId != null) {
                     "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
-                else null
+                } else {
+                    null
+                }
                 entities.add(
                     ImportedFileEntity(
                         fileUri = file.uri.toString(),

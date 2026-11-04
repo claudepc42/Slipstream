@@ -481,6 +481,11 @@
     <string name="resize_zoom">Zoom</string>
     <string name="caption_auto_generated">Auto-generated</string>
     <!-- Caption Settings -->
+    <string name="download_captions_with_video">Also download captions</string>
+    <string name="download_captions">Download captions</string>
+    <string name="download_captions_fetching">Fetching captions…</string>
+    <string name="download_captions_no_subtitles">No subtitles available for this video</string>
+    <string name="download_captions_pick_language">Pick caption language</string>
     <string name="caption_setting_title">Captions</string>
     <string name="caption_setting_description">Modify player caption text scale and background styles. Requires app restart to take effect</string>
     <!-- Debug Settings -->

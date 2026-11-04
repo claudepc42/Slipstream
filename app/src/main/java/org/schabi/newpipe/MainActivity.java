@@ -118,6 +118,9 @@ public class MainActivity extends AppCompatActivity {
 
     private BroadcastReceiver broadcastReceiver;
 
+    /** One-shot flag: redirect to Downloads exactly once per process lifetime. */
+    private static boolean sNeedsDownloadRedirect = true;
+
     private static final int ITEM_ID_SUBSCRIPTIONS = -1;
     private static final int ITEM_ID_FEED = -2;
     private static final int ITEM_ID_BOOKMARKS = -3;
@@ -460,6 +463,18 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // history tab removed from drawer
+
+        // On the very first resume of a fresh process, open Downloads as the default page.
+        // sNeedsDownloadRedirect is static so it resets to true only when the process is killed
+        // and restarted — which is exactly when we need the redirect.
+        if (sNeedsDownloadRedirect) {
+            final Fragment currentFragment = getSupportFragmentManager()
+                    .findFragmentById(R.id.fragment_holder);
+            if (currentFragment == null || currentFragment instanceof MainFragment) {
+                sNeedsDownloadRedirect = false;
+                NavigationHelper.openDownloads(this);
+            }
+        }
     }
 
     @Override

@@ -40,6 +40,9 @@ public class DownloadActivity extends AppCompatActivity {
     private static final String TAG = "DownloadActivity";
     private static final String MISSIONS_FRAGMENT_TAG = "fragment_tag";
 
+    /** Set true when the user explicitly backs out so MainActivity doesn't re-open us. */
+    public static boolean sUserBackedOut = false;
+
     private final CompositeDisposable disposables = new CompositeDisposable();
 
     private final ActivityResultLauncher<Intent> pickFolderLauncher =
@@ -151,6 +154,13 @@ public class DownloadActivity extends AppCompatActivity {
         return true;
     }
 
+    @SuppressWarnings("deprecation")
+    @Override
+    public void onBackPressed() {
+        sUserBackedOut = true;
+        super.onBackPressed();
+    }
+
     @Override
     public boolean onOptionsItemSelected(final MenuItem item) {
         final int id = item.getItemId();
@@ -189,7 +199,8 @@ public class DownloadActivity extends AppCompatActivity {
                     },
                     err -> {
                         Log.e(TAG, "Folder scan failed", err);
-                        Toast.makeText(this, R.string.folder_scan_failed, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, R.string.folder_scan_failed,
+                                Toast.LENGTH_SHORT).show();
                     }
                 )
         );

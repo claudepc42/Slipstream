@@ -63,12 +63,24 @@ import org.schabi.newpipe.R;
 import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.UserAction;
+import static org.schabi.newpipe.extractor.stream.DeliveryMethod.PROGRESSIVE_HTTP;
+import static org.schabi.newpipe.util.ListHelper.getStreamsOfSpecifiedDelivery;
+
+import org.schabi.newpipe.extractor.MediaFormat;
 import org.schabi.newpipe.extractor.NewPipe;
+import org.schabi.newpipe.extractor.stream.StreamInfo;
+import org.schabi.newpipe.extractor.stream.SubtitlesStream;
+import org.schabi.newpipe.streams.io.StoredDirectoryHelper;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
+import org.schabi.newpipe.util.ExtractorHelper;
+import org.schabi.newpipe.util.FilenameUtils;
 import org.schabi.newpipe.util.Localization;
 import org.schabi.newpipe.util.NavigationHelper;
+import org.schabi.newpipe.util.SubtitleHelper;
 import org.schabi.newpipe.util.WatchProgressHelper;
 import org.schabi.newpipe.player.LocalPlayerActivity;
+import us.shandian.giga.postprocessing.Postprocessing;
+import androidx.preference.PreferenceManager;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -87,8 +99,11 @@ import java.util.Locale;
 import java.util.Set;
 import java.text.DateFormat;
 
+import android.media.MediaMetadataRetriever;
+
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import us.shandian.giga.get.DownloadMission;
@@ -276,29 +291,34 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
                 h.thumbnail.setImageResource(R.drawable.ic_movie);
             }
 
-            // Load watch progress bar
-            if (source != null && !source.isEmpty()) {
-                WatchProgressHelper.INSTANCE.loadProgress(mContext, source)
+            // Load watch progress bar and time labels.
+            // Always show total duration on every thumbnail; current position shown only when
+            // the video has been partially watched.
+            final String progressVideoId = videoId;
+            final Uri fileUri = item.mission.storage.isInvalid() ? null : item.mission.storage.getUri();
+            final DownloadManager.MissionItem boundItem = item;
+
+            if (progressVideoId != null) {
+                WatchProgressHelper.INSTANCE.loadProgress(mContext, progressVideoId)
                     .observeOn(AndroidSchedulers.mainThread())
                     .subscribe(
                         pair -> {
-                            if (pair != null && pair.getSecond() > 0) {
-                                float fraction = (float) pair.getFirst() / (pair.getSecond() * 1000f);
-                                fraction = Math.max(0f, Math.min(1f, fraction));
-                                if (fraction > 0.03f && fraction < 0.97f) {
-                                    h.watchProgressBar.setVisibility(View.VISIBLE);
-                                    h.watchProgressBar.setScaleX(fraction);
-                                } else {
-                                    h.watchProgressBar.setVisibility(View.GONE);
-                                }
-                            } else {
-                                h.watchProgressBar.setVisibility(View.GONE);
-                            }
+                            // Video has been watched — use stored position + duration
+                            if (h.item != boundItem) return;
+                            applyTimeOverlay(h, boundItem, pair.getFirst(), pair.getSecond());
                         },
-                        error -> h.watchProgressBar.setVisibility(View.GONE)
+                        error -> {
+                            if (h.item != boundItem) return;
+                            loadFileDurationAsync(fileUri, h, boundItem);
+                        },
+                        () -> {
+                            // Maybe completed empty: video has never been played — read from file
+                            if (h.item != boundItem) return;
+                            loadFileDurationAsync(fileUri, h, boundItem);
+                        }
                     );
             } else {
-                h.watchProgressBar.setVisibility(View.GONE);
+                loadFileDurationAsync(fileUri, h, boundItem);
             }
         }
     }
@@ -311,6 +331,77 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
     @Override
     public int getItemViewType(int position) {
         return mIterator.getSpecialAtItem(position);
+    }
+
+    @SuppressLint("DefaultLocale")
+    private static String formatDuration(long millis) {
+        long totalMins = millis / 60000;
+        long hours = totalMins / 60;
+        long minutes = totalMins % 60;
+        if (hours > 0) {
+            return String.format("%dh %02dm", hours, minutes);
+        } else {
+            return String.format("%dm", minutes);
+        }
+    }
+
+    private void applyTimeOverlay(ViewHolderItem h, DownloadManager.MissionItem expectedItem,
+            long posMs, long durMs) {
+        if (h.item != expectedItem) return;
+        if (durMs <= 0) {
+            h.timeOverlay.setVisibility(View.GONE);
+            h.watchProgressBar.setVisibility(View.GONE);
+            return;
+        }
+        h.totalTime.setText(formatDuration(durMs));
+        if (posMs > 0) {
+            float fraction = Math.max(0f, Math.min(1f, (float) posMs / (float) durMs));
+            if (fraction > 0.03f && fraction < 0.97f) {
+                h.currentTime.setText(formatDuration(posMs));
+                h.watchProgressBar.setVisibility(View.VISIBLE);
+                h.watchProgressBar.setScaleX(fraction);
+            } else {
+                h.currentTime.setText("");
+                h.watchProgressBar.setVisibility(View.GONE);
+            }
+        } else {
+            h.currentTime.setText("");
+            h.watchProgressBar.setVisibility(View.GONE);
+        }
+        h.timeOverlay.setVisibility(View.VISIBLE);
+    }
+
+    private void loadFileDurationAsync(Uri fileUri, ViewHolderItem h,
+            DownloadManager.MissionItem expectedItem) {
+        if (fileUri == null) return;
+        Single.fromCallable(() -> {
+            MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+            try {
+                if ("file".equals(fileUri.getScheme())) {
+                    // Legacy file:// URI — pass the path directly
+                    mmr.setDataSource(fileUri.getPath());
+                } else {
+                    // SAF content:// URI — must go through ContentResolver
+                    android.os.ParcelFileDescriptor pfd =
+                            mContext.getContentResolver().openFileDescriptor(fileUri, "r");
+                    if (pfd == null) return 0L;
+                    mmr.setDataSource(pfd.getFileDescriptor());
+                    pfd.close();
+                }
+                String dur = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+                return dur != null ? Long.parseLong(dur) : 0L;
+            } catch (Exception e) {
+                return 0L;
+            } finally {
+                try { mmr.release(); } catch (Exception ignored) { }
+            }
+        })
+        .subscribeOn(Schedulers.io())
+        .observeOn(AndroidSchedulers.mainThread())
+        .subscribe(
+            durMs -> applyTimeOverlay(h, expectedItem, 0L, durMs),
+            err -> { }
+        );
     }
 
     @SuppressLint("DefaultLocale")
@@ -766,13 +857,8 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
         if (id == R.id.menu_item_share) {
             shareFile(h.item.mission);
             return true;
-        } else if (id == R.id.delete) {// delete the entry and the file
+        } else if (id == R.id.delete) {
             mDeleter.append(h.item.mission, true);
-            applyChanges();
-            checkMasterButtonsVisibility();
-            return true;
-        } else if (id == R.id.delete_entry) {// just delete the entry
-            mDeleter.append(h.item.mission, false);
             applyChanges();
             checkMasterButtonsVisibility();
             return true;
@@ -817,8 +903,123 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
                 Log.w(TAG, "Selected item has a invalid source", e);
             }
             return true;
+        } else if (id == R.id.download_captions) {
+            triggerCaptionDownload(h.item.mission);
+            return true;
         }
         return false;
+    }
+
+    private void triggerCaptionDownload(final Mission mission) {
+        final String sourceUrl = mission.source;
+        if (sourceUrl == null || sourceUrl.isEmpty()) return;
+
+        Toast.makeText(mContext, R.string.download_captions_fetching, Toast.LENGTH_SHORT).show();
+
+        compositeDisposable.add(
+            ExtractorHelper.getStreamInfo(0, sourceUrl, false)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                    streamInfo -> showSubtitlePicker(mission, streamInfo),
+                    err -> {
+                        Log.e(TAG, "Failed to fetch stream info for captions", err);
+                        Toast.makeText(mContext, R.string.general_error, Toast.LENGTH_SHORT).show();
+                    }
+                )
+        );
+    }
+
+    private void showSubtitlePicker(final Mission mission, final StreamInfo streamInfo) {
+        final List<SubtitlesStream> subs = getStreamsOfSpecifiedDelivery(
+                streamInfo.getSubtitles(), PROGRESSIVE_HTTP);
+
+        if (subs.isEmpty()) {
+            Toast.makeText(mContext, R.string.download_captions_no_subtitles,
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        final String[] labels = new String[subs.size()];
+        for (int i = 0; i < subs.size(); i++) {
+            labels[i] = subs.get(i).getLanguageTag()
+                    + (subs.get(i).isAutoGenerated() ? " (auto)" : "");
+        }
+
+        new AlertDialog.Builder(mContext)
+            .setTitle(R.string.download_captions_pick_language)
+            .setItems(labels, (dialog, which) ->
+                    downloadSubtitleEntry(mission, streamInfo, subs.get(which)))
+            .setNegativeButton(R.string.cancel, null)
+            .show();
+    }
+
+    private void downloadSubtitleEntry(final Mission mission, final StreamInfo streamInfo,
+                                       final SubtitlesStream stream) {
+        final String videoPathPref = PreferenceManager.getDefaultSharedPreferences(mContext)
+                .getString(mContext.getString(R.string.download_path_video_key), null);
+        if (videoPathPref == null || videoPathPref.isEmpty()) {
+            Toast.makeText(mContext, R.string.no_dir_yet, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        final String baseName = FilenameUtils.createFilename(mContext, streamInfo.getName());
+        final String langCode = stream.getLanguageTag();
+        final MediaFormat fmt = stream.getFormat();
+
+        final String ext;
+        final String mime;
+        String psName = null;
+        String[] psArgs = null;
+
+        if (fmt == MediaFormat.TTML) {
+            ext = MediaFormat.SRT.getSuffix();
+            mime = MediaFormat.SRT.mimeType;
+            psName = Postprocessing.ALGORITHM_TTML_CONVERTER;
+            psArgs = new String[]{fmt.getSuffix(), "false"};
+        } else if (fmt != null) {
+            ext = fmt.getSuffix();
+            mime = fmt.mimeType;
+        } else {
+            ext = "vtt";
+            mime = "text/vtt";
+        }
+
+        final String captionFilename = mContext.getString(
+                R.string.caption_file_name, baseName, langCode) + "." + ext;
+
+        try {
+            final StoredDirectoryHelper dir = new StoredDirectoryHelper(
+                    mContext, android.net.Uri.parse(videoPathPref), DownloadManager.TAG_VIDEO);
+            if (!dir.mkdirs()) {
+                Toast.makeText(mContext, R.string.error_path_creation, Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            final StoredFileHelper captionStorage = dir.createFile(captionFilename, mime);
+            if (captionStorage == null || !captionStorage.canWrite()) {
+                Toast.makeText(mContext, R.string.error_file_creation, Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            DownloadManagerService.startMission(mContext,
+                    new String[]{stream.getContent()}, captionStorage, 's', 1,
+                    streamInfo, psName, psArgs, 0,
+                    new ArrayList<>(List.of(new MissionRecoveryInfo(stream))));
+
+            final String videoId = WatchProgressHelper.INSTANCE.extractYouTubeVideoId(
+                    mission.source);
+            if (videoId != null) {
+                SubtitleHelper.INSTANCE.storeSubtitleUri(mContext, videoId,
+                        captionStorage.getUri());
+            }
+
+            Toast.makeText(mContext, R.string.download_has_started, Toast.LENGTH_SHORT).show();
+
+        } catch (final java.io.IOException e) {
+            Log.e(TAG, "Failed to set up caption storage", e);
+            Toast.makeText(mContext, R.string.general_error, Toast.LENGTH_SHORT).show();
+        }
     }
 
     public void applyChanges() {
@@ -1012,6 +1213,9 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
         ImageView icon;
         ImageView thumbnail;
         View watchProgressBar;
+        View timeOverlay;
+        TextView currentTime;
+        TextView totalTime;
         View progressOverlay;
         TextView name;
         TextView size;
@@ -1028,6 +1232,7 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
         MenuItem showError;
         MenuItem delete;
         MenuItem source;
+        MenuItem downloadCaptions;
         MenuItem checksum;
 
         long lastTimestamp = -1;
@@ -1048,6 +1253,9 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
             thumbnail = itemView.findViewById(R.id.item_thumbnail);
             watchProgressBar = itemView.findViewById(R.id.item_watch_progress);
             watchProgressBar.setPivotX(0f);
+            timeOverlay = itemView.findViewById(R.id.item_time_overlay);
+            currentTime = itemView.findViewById(R.id.item_current_time);
+            totalTime = itemView.findViewById(R.id.item_total_time);
             progressOverlay = itemView.findViewById(R.id.item_progress_overlay);
             size = itemView.findViewById(R.id.item_size);
             date = itemView.findViewById(R.id.item_date);
@@ -1068,6 +1276,7 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
             showError = menu.findItem(R.id.error_message_view);
             delete = menu.findItem(R.id.delete);
             source = menu.findItem(R.id.source);
+            downloadCaptions = menu.findItem(R.id.download_captions);
             checksum = menu.findItem(R.id.checksum);
 
             itemView.setHapticFeedbackEnabled(true);
@@ -1105,6 +1314,7 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
             showError.setVisible(false);
             delete.setVisible(false);
             source.setVisible(false);
+            downloadCaptions.setVisible(false);
             checksum.setVisible(false);
 
             DownloadMission mission = item.mission instanceof DownloadMission ? (DownloadMission) item.mission : null;
@@ -1148,6 +1358,10 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
 
             if (item.mission.source != null && !item.mission.source.isEmpty()) {
                 source.setVisible(true);
+                // Show "Download captions" only for finished YouTube videos
+                if (item.mission instanceof FinishedMission) {
+                    downloadCaptions.setVisible(true);
+                }
             }
 
             popupMenu.show();
@@ -1187,11 +1401,10 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
     @Nullable
     private static String extractYouTubeIdFromFilename(@Nullable String filename) {
         if (filename == null || filename.isEmpty()) return null;
+        // Only use bracket/parenthesis match — bare 11-char match produces too many false positives
+        // from title words (e.g. "Battlefield"). Source URL fallback handles the rest.
         Matcher m = YT_ID_BRACKET.matcher(filename);
         if (m.find()) return m.group(1);
-        // Bare match: skip common short words that happen to be 11 chars
-        Matcher m2 = YT_ID_BARE.matcher(filename.replaceAll("\\.[^.]+$", ""));
-        if (m2.find()) return m2.group(1);
         return null;
     }
 

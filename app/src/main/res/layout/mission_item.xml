@@ -50,6 +50,50 @@
                 android:layout_height="match_parent"
                 android:alpha="0.0" />
 
+            <!-- Watch time labels: current position (left) and total duration (right) -->
+            <LinearLayout
+                android:id="@+id/item_time_overlay"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|start"
+                android:layout_marginBottom="6dp"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/item_current_time"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:shadowColor="#CC000000"
+                    android:shadowRadius="4"
+                    android:shadowDx="1"
+                    android:shadowDy="1"
+                    android:gravity="start"
+                    android:text="" />
+
+                <TextView
+                    android:id="@+id/item_total_time"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:shadowColor="#CC000000"
+                    android:shadowRadius="4"
+                    android:shadowDx="1"
+                    android:shadowDy="1"
+                    android:gravity="end"
+                    android:text="" />
+
+            </LinearLayout>
+
             <!-- Watch progress bar at bottom of thumbnail (scaleX + pivotX=0 used for progress) -->
             <View
                 android:id="@+id/item_watch_progress"

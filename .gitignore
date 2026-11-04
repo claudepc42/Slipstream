@@ -17,6 +17,10 @@ app/release/
 CLAUDE.md
 SlipstreamPRD.md
 
+# Signing key — never commit
+*.jks
+*.keystore
+
 # vscode / eclipse files
 *.classpath
 *.project

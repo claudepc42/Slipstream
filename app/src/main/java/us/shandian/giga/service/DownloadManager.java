@@ -494,6 +494,19 @@ public class DownloadManager {
         }
     }
 
+    /** Returns the set of file URI strings for all finished missions. */
+    public java.util.Set<String> getFinishedMissionUris() {
+        synchronized (this) {
+            java.util.Set<String> uris = new java.util.HashSet<>();
+            for (FinishedMission mission : mMissionsFinished) {
+                if (mission.storage != null) {
+                    uris.add(mission.storage.getUri().toString());
+                }
+            }
+            return uris;
+        }
+    }
+
     private boolean canDownloadInCurrentNetwork() {
         if (mLastNetworkStatus == NetworkState.Unavailable) return false;
         return !(mPrefMeteredDownloads && mLastNetworkStatus == NetworkState.MeteredOperating);

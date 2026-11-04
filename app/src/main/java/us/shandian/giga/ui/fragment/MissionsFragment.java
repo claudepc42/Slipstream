@@ -78,6 +78,7 @@ public class MissionsFragment extends Fragment {
     private Context mContext;
 
     private DownloadManagerBinder mBinder;
+    private java.util.List<org.schabi.newpipe.database.imported.ImportedFileEntity> mAllImportedItems = new java.util.ArrayList<>();
     private boolean mForceUpdate;
     private final CompositeDisposable disposables = new CompositeDisposable();
 
@@ -142,6 +143,7 @@ public class MissionsFragment extends Fragment {
 
             updateList();
             mAdapter.cleanGhostEntries();
+            updateImportedList();
         }
 
         @Override
@@ -173,15 +175,13 @@ public class MissionsFragment extends Fragment {
         mImportedList.setAdapter(mImportedAdapter);
         mImportedList.setLayoutManager(new GridLayoutManager(getActivity(), SPAN_SIZE));
 
-        // Observe imported files from DB
+        // Observe imported files from DB — filter out files already in the downloads list
         disposables.add(
             NewPipeDatabase.getInstance(mContext).importedFileDAO().getAll()
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(items -> {
-                    mImportedAdapter.setItems(items);
-                    int visibility = items.isEmpty() ? View.GONE : View.VISIBLE;
-                    mImportedList.setVisibility(visibility);
-                    mImportedHeader.setVisibility(visibility);
+                    mAllImportedItems = items;
+                    updateImportedList();
                 }, err -> { /* ignore */ })
         );
 
@@ -307,6 +307,23 @@ public class MissionsFragment extends Fragment {
                 .setPositiveButton(R.string.ok, (dialog, which) ->
                         mAdapter.clearFinishedDownloads(true))
                 .show();
+    }
+
+    private void updateImportedList() {
+        java.util.Set<String> missionUris = mBinder != null
+                ? mBinder.getDownloadManager().getFinishedMissionUris()
+                : java.util.Collections.emptySet();
+        java.util.List<org.schabi.newpipe.database.imported.ImportedFileEntity> filtered =
+                new java.util.ArrayList<>();
+        for (org.schabi.newpipe.database.imported.ImportedFileEntity item : mAllImportedItems) {
+            if (!missionUris.contains(item.getFileUri())) {
+                filtered.add(item);
+            }
+        }
+        mImportedAdapter.setItems(filtered);
+        int visibility = filtered.isEmpty() ? View.GONE : View.VISIBLE;
+        mImportedList.setVisibility(visibility);
+        mImportedHeader.setVisibility(visibility);
     }
 
     private void updateList() {
