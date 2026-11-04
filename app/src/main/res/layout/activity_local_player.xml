@@ -47,6 +47,15 @@
             android:textStyle="bold" />
 
         <ImageButton
+            android:id="@+id/local_player_cc"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Captions"
+            android:padding="10dp"
+            android:src="@drawable/ic_subtitles" />
+
+        <ImageButton
             android:id="@+id/local_player_airplay"
             android:layout_width="48dp"
             android:layout_height="48dp"

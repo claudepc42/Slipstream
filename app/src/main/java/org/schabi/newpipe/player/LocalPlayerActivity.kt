@@ -4,11 +4,13 @@ import android.app.AlertDialog
 import android.app.PictureInPictureParams
 import android.content.SharedPreferences
 import android.content.res.Configuration
+import android.graphics.Color
 import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Rational
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -17,8 +19,10 @@ import android.view.WindowManager
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
+import com.google.android.exoplayer2.text.CaptionStyleCompat
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
@@ -58,6 +62,9 @@ class LocalPlayerActivity : AppCompatActivity() {
     private var mimeType: String = "video/mp4"
     private var fileSize: Long = -1L
 
+    private var captionsEnabled = false
+    private lateinit var ccButton: ImageButton
+
     private var airPlaySender: AirPlaySender? = null
     private var fileServer: LocalFileHttpServer? = null
     private var currentAirPlayReceiver: AirPlayReceiver? = null
@@ -95,6 +102,12 @@ class LocalPlayerActivity : AppCompatActivity() {
         findViewById<ImageButton>(R.id.local_player_back).setOnClickListener {
             @Suppress("DEPRECATION") onBackPressed()
         }
+        ccButton = findViewById(R.id.local_player_cc)
+        ccButton.setOnClickListener { toggleCaptions() }
+        ccButton.setOnLongClickListener { showCaptionSettings(); true }
+        // Hide CC button until a subtitle track is loaded
+        ccButton.visibility = View.GONE
+
         findViewById<ImageButton>(R.id.local_player_airplay).setOnClickListener {
             showAirPlayPicker()
         }
@@ -333,11 +346,106 @@ class LocalPlayerActivity : AppCompatActivity() {
                             .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
                             .build()
                         builder.setSubtitleConfigurations(listOf(sub))
+                        captionsEnabled = true
+                        ccButton.visibility = View.VISIBLE
+                        applySubtitleStyle()
                     }
                 } catch (_: Exception) {}
             }
         }
         return builder.build()
+    }
+
+    private fun toggleCaptions() {
+        captionsEnabled = !captionsEnabled
+        val params = localPlayer?.trackSelectionParameters?.buildUpon()
+            ?.setDisabledTrackTypes(if (captionsEnabled) emptySet() else setOf(C.TRACK_TYPE_TEXT))
+            ?.build() ?: return
+        localPlayer?.trackSelectionParameters = params
+        ccButton.alpha = if (captionsEnabled) 1f else 0.4f
+    }
+
+    private fun applySubtitleStyle() {
+        val bgAlpha = prefs.getInt("cc_bg_alpha", 128)
+        val fontSize = prefs.getFloat("cc_font_size", 18f)
+        val textColor = prefs.getInt("cc_text_color", Color.WHITE)
+        val sv = playerView.subtitleView ?: return
+        sv.setApplyEmbeddedStyles(false)
+        sv.setStyle(CaptionStyleCompat(
+            textColor,
+            Color.argb(bgAlpha, 0, 0, 0),
+            Color.TRANSPARENT,
+            CaptionStyleCompat.EDGE_TYPE_OUTLINE,
+            Color.BLACK,
+            null
+        ))
+        sv.setFixedTextSize(TypedValue.COMPLEX_UNIT_SP, fontSize)
+    }
+
+    private fun showCaptionSettings() {
+        val dp8 = (8 * resources.displayMetrics.density).toInt()
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp8 * 2, dp8, dp8 * 2, dp8)
+        }
+
+        // Background opacity
+        val bgLabel = TextView(this).apply { text = "Background opacity" }
+        val bgAlpha = prefs.getInt("cc_bg_alpha", 128)
+        val bgBar = SeekBar(this).apply {
+            max = 255
+            progress = bgAlpha
+        }
+        container.addView(bgLabel)
+        container.addView(bgBar)
+
+        // Font size
+        val sizeLabel = TextView(this).apply { text = "Font size (sp)" }
+        val fontSize = prefs.getFloat("cc_font_size", 18f).toInt()
+        val sizeBar = SeekBar(this).apply {
+            max = 48    // 8–48 sp range; progress offset by 8
+            progress = (fontSize - 8).coerceIn(0, 40)
+        }
+        container.addView(sizeLabel)
+        container.addView(sizeBar)
+
+        // Text color
+        val colorLabel = TextView(this).apply { text = "Text color" }
+        val colorOptions = arrayOf("White", "Yellow", "Green", "Cyan")
+        val colorValues = intArrayOf(Color.WHITE, Color.YELLOW, Color.GREEN, Color.CYAN)
+        val currentColor = prefs.getInt("cc_text_color", Color.WHITE)
+        var selectedColorIdx = colorValues.indexOfFirst { it == currentColor }.coerceAtLeast(0)
+        val colorRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        colorOptions.forEachIndexed { i, name ->
+            android.widget.Button(this).apply {
+                text = name
+                isActivated = i == selectedColorIdx
+                alpha = if (i == selectedColorIdx) 1f else 0.5f
+                setOnClickListener {
+                    selectedColorIdx = i
+                    for (j in 0 until colorRow.childCount) {
+                        colorRow.getChildAt(j).alpha = if (j == i) 1f else 0.5f
+                    }
+                }
+                colorRow.addView(this)
+            }
+        }
+        container.addView(colorLabel)
+        container.addView(colorRow)
+
+        AlertDialog.Builder(this)
+            .setTitle("Caption settings")
+            .setView(container)
+            .setPositiveButton("Apply") { _, _ ->
+                prefs.edit()
+                    .putInt("cc_bg_alpha", bgBar.progress)
+                    .putFloat("cc_font_size", (sizeBar.progress + 8).toFloat())
+                    .putInt("cc_text_color", colorValues[selectedColorIdx])
+                    .apply()
+                applySubtitleStyle()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun initLocalPlayer() {

@@ -623,6 +623,10 @@ public class DownloadManager {
             synchronized (DownloadManager.this) {
                 ArrayList<Mission> pending = new ArrayList<>(mMissionsPending);
                 ArrayList<Mission> finished = new ArrayList<>(mMissionsFinished);
+
+                // Hide subtitle companion downloads (kind='s') — they're not standalone videos
+                pending.removeIf(m -> m.kind == 's');
+                finished.removeIf(m -> m.kind == 's');
                 List<Mission> remove = new ArrayList<>(hidden);
 
                 // Don't hide recoverable missions
