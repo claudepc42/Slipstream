@@ -25,6 +25,8 @@ import androidx.preference.PreferenceManager
 import com.google.android.exoplayer2.C
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
+import com.google.android.exoplayer2.PlaybackException
+import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.ui.StyledPlayerView
 import com.google.android.exoplayer2.util.MimeTypes
 import java.net.Inet4Address
@@ -315,26 +317,51 @@ class LocalPlayerActivity : AppCompatActivity() {
         }
     }
 
+    private fun buildMediaItem(withSubtitle: Boolean): MediaItem {
+        val uri = fileUri!!
+        val builder = MediaItem.Builder().setUri(uri)
+        if (withSubtitle) {
+            val subtitleUri = SubtitleHelper.getSubtitleUri(this, bookmarkKey)
+            if (subtitleUri != null) {
+                try {
+                    // Only attach if the file actually has content (download may still be in progress)
+                    val size = contentResolver.openFileDescriptor(subtitleUri, "r")
+                        ?.use { it.statSize } ?: 0L
+                    if (size > 0L) {
+                        val sub = MediaItem.SubtitleConfiguration.Builder(subtitleUri)
+                            .setMimeType(SubtitleHelper.mimeTypeFor(subtitleUri))
+                            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                            .build()
+                        builder.setSubtitleConfigurations(listOf(sub))
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        return builder.build()
+    }
+
     private fun initLocalPlayer() {
         val uri = fileUri ?: return
         localPlayer = ExoPlayer.Builder(this).build().also { exo ->
             playerView.player = exo
 
-            val mediaItemBuilder = MediaItem.Builder().setUri(uri)
-            val subtitleUri = SubtitleHelper.getSubtitleUri(this, bookmarkKey)
-            if (subtitleUri != null) {
-                try {
-                    val subtitle = MediaItem.SubtitleConfiguration.Builder(subtitleUri)
-                        .setMimeType(SubtitleHelper.mimeTypeFor(subtitleUri))
-                        .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
-                        .build()
-                    mediaItemBuilder.setSubtitleConfigurations(listOf(subtitle))
-                } catch (e: Exception) {
-                    // proceed without subtitle if configuration fails
+            var subtitleFailed = false
+            exo.addListener(object : Player.Listener {
+                override fun onPlayerError(error: PlaybackException) {
+                    if (!subtitleFailed) {
+                        subtitleFailed = true
+                        // Retry without subtitles so the video still plays
+                        exo.stop()
+                        exo.setMediaItem(buildMediaItem(withSubtitle = false))
+                        exo.prepare()
+                        val saved = prefs.getLong(progressKey ?: return, 0L)
+                        if (saved > 0L) exo.seekTo(saved)
+                        exo.play()
+                    }
                 }
-            }
+            })
 
-            exo.setMediaItem(mediaItemBuilder.build())
+            exo.setMediaItem(buildMediaItem(withSubtitle = true))
             exo.prepare()
             val saved = prefs.getLong(progressKey ?: return@also, 0L)
             if (saved > 0L) exo.seekTo(saved)
