@@ -23,7 +23,7 @@ import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
-import com.google.android.exoplayer2.text.CaptionStyleCompat
+import com.google.android.exoplayer2.ui.CaptionStyleCompat
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
