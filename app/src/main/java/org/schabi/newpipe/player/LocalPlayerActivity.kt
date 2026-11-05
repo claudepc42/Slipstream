@@ -65,7 +65,7 @@ class LocalPlayerActivity : AppCompatActivity() {
     private var fileSize: Long = -1L
 
     private var captionsEnabled = false
-    private lateinit var ccButton: ImageButton
+    private lateinit var ccButton: android.widget.Button
 
     private var airPlaySender: AirPlaySender? = null
     private var fileServer: LocalFileHttpServer? = null
@@ -104,7 +104,7 @@ class LocalPlayerActivity : AppCompatActivity() {
         findViewById<ImageButton>(R.id.local_player_back).setOnClickListener {
             @Suppress("DEPRECATION") onBackPressed()
         }
-        ccButton = findViewById(R.id.local_player_cc)
+        ccButton = findViewById<android.widget.Button>(R.id.local_player_cc)
         ccButton.setOnClickListener { showCaptionDialog() }
 
         findViewById<ImageButton>(R.id.local_player_airplay).setOnClickListener {
