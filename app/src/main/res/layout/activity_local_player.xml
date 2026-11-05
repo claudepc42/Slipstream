@@ -53,8 +53,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="Captions"
             android:padding="10dp"
-            android:src="@drawable/ic_subtitles"
-            android:tint="#FFFFFFFF" />
+            android:src="@drawable/ic_subtitles_white" />
 
         <ImageButton
             android:id="@+id/local_player_airplay"
