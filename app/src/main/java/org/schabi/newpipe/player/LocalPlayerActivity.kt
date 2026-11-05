@@ -358,7 +358,11 @@ class LocalPlayerActivity : AppCompatActivity() {
         val bgAlpha = prefs.getInt("cc_bg_alpha", 128)
         val fontSize = prefs.getFloat("cc_font_size", 18f)
         val textColor = prefs.getInt("cc_text_color", Color.WHITE)
-        val sv = playerView.subtitleView ?: return
+        val sv = playerView.subtitleView
+        if (sv == null) {
+            playerView.post { applySubtitleStyle() }
+            return
+        }
         sv.setApplyEmbeddedStyles(false)
         sv.setStyle(CaptionStyleCompat(
             textColor,
@@ -396,6 +400,16 @@ class LocalPlayerActivity : AppCompatActivity() {
         val enableSwitch = android.widget.Switch(this).apply {
             isEnabled = hasSubtitle
             isChecked = captionsEnabled && hasSubtitle
+            setOnCheckedChangeListener { _, checked ->
+                if (!hasSubtitle) return@setOnCheckedChangeListener
+                captionsEnabled = checked
+                val params = localPlayer?.trackSelectionParameters?.buildUpon()
+                    ?.setDisabledTrackTypes(
+                        if (captionsEnabled) emptySet() else setOf(C.TRACK_TYPE_TEXT))
+                    ?.build()
+                if (params != null) localPlayer?.trackSelectionParameters = params
+                ccButton.alpha = if (captionsEnabled) 1f else 0.4f
+            }
         }
         enableRow.addView(enableLabel)
         enableRow.addView(enableSwitch)
@@ -427,20 +441,39 @@ class LocalPlayerActivity : AppCompatActivity() {
                 setBackgroundColor(Color.GRAY)
             })
 
-            // Background opacity
+            // Background opacity — saves and applies live
             container.addView(TextView(this).apply { text = "Background opacity" })
-            val bgBar = SeekBar(this).apply { max = 255; progress = prefs.getInt("cc_bg_alpha", 128) }
+            val bgBar = SeekBar(this).apply {
+                max = 255
+                progress = prefs.getInt("cc_bg_alpha", 128)
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(sb: SeekBar, p: Int, fromUser: Boolean) {
+                        prefs.edit().putInt("cc_bg_alpha", p).apply()
+                        applySubtitleStyle()
+                    }
+                    override fun onStartTrackingTouch(sb: SeekBar) {}
+                    override fun onStopTrackingTouch(sb: SeekBar) {}
+                })
+            }
             container.addView(bgBar)
 
-            // Font size
+            // Font size — saves and applies live
             container.addView(TextView(this).apply { text = "Font size" })
             val sizeBar = SeekBar(this).apply {
                 max = 40  // maps to 8–48 sp
                 progress = (prefs.getFloat("cc_font_size", 18f).toInt() - 8).coerceIn(0, 40)
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(sb: SeekBar, p: Int, fromUser: Boolean) {
+                        prefs.edit().putFloat("cc_font_size", (p + 8).toFloat()).apply()
+                        applySubtitleStyle()
+                    }
+                    override fun onStartTrackingTouch(sb: SeekBar) {}
+                    override fun onStopTrackingTouch(sb: SeekBar) {}
+                })
             }
             container.addView(sizeBar)
 
-            // Text color
+            // Text color — saves and applies live on tap
             container.addView(TextView(this).apply { text = "Text color" })
             val colorOptions = arrayOf("White", "Yellow", "Green", "Cyan")
             val colorValues = intArrayOf(Color.WHITE, Color.YELLOW, Color.GREEN, Color.CYAN)
@@ -456,6 +489,8 @@ class LocalPlayerActivity : AppCompatActivity() {
                         for (j in 0 until colorRow.childCount) {
                             colorRow.getChildAt(j).alpha = if (j == i) 1f else 0.5f
                         }
+                        prefs.edit().putInt("cc_text_color", colorValues[i]).apply()
+                        applySubtitleStyle()
                     }
                     colorRow.addView(this)
                 }
@@ -465,22 +500,7 @@ class LocalPlayerActivity : AppCompatActivity() {
             AlertDialog.Builder(this)
                 .setTitle("Captions")
                 .setView(scroll)
-                .setPositiveButton("Apply") { _, _ ->
-                    captionsEnabled = enableSwitch.isChecked
-                    val params = localPlayer?.trackSelectionParameters?.buildUpon()
-                        ?.setDisabledTrackTypes(
-                            if (captionsEnabled) emptySet() else setOf(C.TRACK_TYPE_TEXT))
-                        ?.build()
-                    if (params != null) localPlayer?.trackSelectionParameters = params
-                    ccButton.alpha = if (captionsEnabled) 1f else 0.4f
-                    prefs.edit()
-                        .putInt("cc_bg_alpha", bgBar.progress)
-                        .putFloat("cc_font_size", (sizeBar.progress + 8).toFloat())
-                        .putInt("cc_text_color", colorValues[selectedColorIdx])
-                        .apply()
-                    applySubtitleStyle()
-                }
-                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Done", null)
                 .show()
         } else {
             AlertDialog.Builder(this)
