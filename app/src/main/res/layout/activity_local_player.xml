@@ -46,11 +46,14 @@
             android:textSize="16sp"
             android:textStyle="bold" />
 
-        <Button
+        <TextView
             android:id="@+id/local_player_cc"
             android:layout_width="wrap_content"
             android:layout_height="48dp"
+            android:clickable="true"
+            android:focusable="true"
             android:background="?attr/selectableItemBackgroundBorderless"
+            android:gravity="center"
             android:text="CC"
             android:textColor="#FFFFFFFF"
             android:textSize="13sp"
