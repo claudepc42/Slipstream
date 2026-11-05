@@ -2,6 +2,7 @@ package org.schabi.newpipe.player
 
 import android.app.AlertDialog
 import android.app.PictureInPictureParams
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.graphics.Color
@@ -50,6 +51,7 @@ class LocalPlayerActivity : AppCompatActivity() {
         const val EXTRA_TITLE = "local_player_title"
         const val EXTRA_VIDEO_ID = "local_player_video_id"
         const val EXTRA_MIME_TYPE = "local_player_mime_type"
+        private const val REQUEST_SUBTITLE_FILE = 42
     }
 
     private var localPlayer: ExoPlayer? = null
@@ -103,10 +105,7 @@ class LocalPlayerActivity : AppCompatActivity() {
             @Suppress("DEPRECATION") onBackPressed()
         }
         ccButton = findViewById(R.id.local_player_cc)
-        ccButton.setOnClickListener { toggleCaptions() }
-        ccButton.setOnLongClickListener { showCaptionSettings(); true }
-        // Hide CC button until a subtitle track is loaded
-        ccButton.visibility = View.GONE
+        ccButton.setOnClickListener { showCaptionDialog() }
 
         findViewById<ImageButton>(R.id.local_player_airplay).setOnClickListener {
             showAirPlayPicker()
@@ -347,22 +346,12 @@ class LocalPlayerActivity : AppCompatActivity() {
                             .build()
                         builder.setSubtitleConfigurations(listOf(sub))
                         captionsEnabled = true
-                        ccButton.visibility = View.VISIBLE
                         applySubtitleStyle()
                     }
                 } catch (_: Exception) {}
             }
         }
         return builder.build()
-    }
-
-    private fun toggleCaptions() {
-        captionsEnabled = !captionsEnabled
-        val params = localPlayer?.trackSelectionParameters?.buildUpon()
-            ?.setDisabledTrackTypes(if (captionsEnabled) emptySet() else setOf(C.TRACK_TYPE_TEXT))
-            ?.build() ?: return
-        localPlayer?.trackSelectionParameters = params
-        ccButton.alpha = if (captionsEnabled) 1f else 0.4f
     }
 
     private fun applySubtitleStyle() {
@@ -382,74 +371,152 @@ class LocalPlayerActivity : AppCompatActivity() {
         sv.setFixedTextSize(TypedValue.COMPLEX_UNIT_SP, fontSize)
     }
 
-    private fun showCaptionSettings() {
+    private fun showCaptionDialog() {
         val dp8 = (8 * resources.displayMetrics.density).toInt()
+        val scroll = ScrollView(this)
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp8 * 2, dp8, dp8 * 2, dp8)
         }
+        scroll.addView(container)
 
-        // Background opacity
-        val bgLabel = TextView(this).apply { text = "Background opacity" }
-        val bgAlpha = prefs.getInt("cc_bg_alpha", 128)
-        val bgBar = SeekBar(this).apply {
-            max = 255
-            progress = bgAlpha
+        val hasSubtitle = SubtitleHelper.getSubtitleUri(this, bookmarkKey) != null
+
+        // Enable / disable toggle row
+        val enableRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
         }
-        container.addView(bgLabel)
-        container.addView(bgBar)
-
-        // Font size
-        val sizeLabel = TextView(this).apply { text = "Font size (sp)" }
-        val fontSize = prefs.getFloat("cc_font_size", 18f).toInt()
-        val sizeBar = SeekBar(this).apply {
-            max = 48    // 8–48 sp range; progress offset by 8
-            progress = (fontSize - 8).coerceIn(0, 40)
+        val enableLabel = TextView(this).apply {
+            text = if (hasSubtitle) "Captions" else "No subtitle linked"
+            textSize = 16f
+            layoutParams = LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f)
         }
-        container.addView(sizeLabel)
-        container.addView(sizeBar)
+        val enableSwitch = android.widget.Switch(this).apply {
+            isEnabled = hasSubtitle
+            isChecked = captionsEnabled && hasSubtitle
+        }
+        enableRow.addView(enableLabel)
+        enableRow.addView(enableSwitch)
+        container.addView(enableRow)
 
-        // Text color
-        val colorLabel = TextView(this).apply { text = "Text color" }
-        val colorOptions = arrayOf("White", "Yellow", "Green", "Cyan")
-        val colorValues = intArrayOf(Color.WHITE, Color.YELLOW, Color.GREEN, Color.CYAN)
-        val currentColor = prefs.getInt("cc_text_color", Color.WHITE)
-        var selectedColorIdx = colorValues.indexOfFirst { it == currentColor }.coerceAtLeast(0)
-        val colorRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        colorOptions.forEachIndexed { i, name ->
-            android.widget.Button(this).apply {
-                text = name
-                isActivated = i == selectedColorIdx
-                alpha = if (i == selectedColorIdx) 1f else 0.5f
-                setOnClickListener {
-                    selectedColorIdx = i
-                    for (j in 0 until colorRow.childCount) {
-                        colorRow.getChildAt(j).alpha = if (j == i) 1f else 0.5f
-                    }
+        // "Select subtitle file" button — always available
+        val pickBtn = android.widget.Button(this).apply {
+            text = if (hasSubtitle) "Replace subtitle file…" else "Select subtitle file…"
+            setOnClickListener {
+                val pick = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "*/*"
+                    putExtra(Intent.EXTRA_MIME_TYPES,
+                        arrayOf("text/vtt", "application/x-subrip", "text/plain",
+                            "application/ttml+xml"))
                 }
-                colorRow.addView(this)
+                @Suppress("DEPRECATION")
+                startActivityForResult(pick, REQUEST_SUBTITLE_FILE)
             }
         }
-        container.addView(colorLabel)
-        container.addView(colorRow)
+        container.addView(pickBtn)
 
-        AlertDialog.Builder(this)
-            .setTitle("Caption settings")
-            .setView(container)
-            .setPositiveButton("Apply") { _, _ ->
-                prefs.edit()
-                    .putInt("cc_bg_alpha", bgBar.progress)
-                    .putFloat("cc_font_size", (sizeBar.progress + 8).toFloat())
-                    .putInt("cc_text_color", colorValues[selectedColorIdx])
-                    .apply()
-                applySubtitleStyle()
+        if (hasSubtitle) {
+            // Divider
+            container.addView(View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, 1).also {
+                    it.topMargin = dp8; it.bottomMargin = dp8
+                }
+                setBackgroundColor(Color.GRAY)
+            })
+
+            // Background opacity
+            container.addView(TextView(this).apply { text = "Background opacity" })
+            val bgBar = SeekBar(this).apply { max = 255; progress = prefs.getInt("cc_bg_alpha", 128) }
+            container.addView(bgBar)
+
+            // Font size
+            container.addView(TextView(this).apply { text = "Font size" })
+            val sizeBar = SeekBar(this).apply {
+                max = 40  // maps to 8–48 sp
+                progress = (prefs.getFloat("cc_font_size", 18f).toInt() - 8).coerceIn(0, 40)
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+            container.addView(sizeBar)
+
+            // Text color
+            container.addView(TextView(this).apply { text = "Text color" })
+            val colorOptions = arrayOf("White", "Yellow", "Green", "Cyan")
+            val colorValues = intArrayOf(Color.WHITE, Color.YELLOW, Color.GREEN, Color.CYAN)
+            val currentColor = prefs.getInt("cc_text_color", Color.WHITE)
+            var selectedColorIdx = colorValues.indexOfFirst { it == currentColor }.coerceAtLeast(0)
+            val colorRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            colorOptions.forEachIndexed { i, name ->
+                android.widget.Button(this).apply {
+                    text = name
+                    alpha = if (i == selectedColorIdx) 1f else 0.5f
+                    setOnClickListener {
+                        selectedColorIdx = i
+                        for (j in 0 until colorRow.childCount) {
+                            colorRow.getChildAt(j).alpha = if (j == i) 1f else 0.5f
+                        }
+                    }
+                    colorRow.addView(this)
+                }
+            }
+            container.addView(colorRow)
+
+            AlertDialog.Builder(this)
+                .setTitle("Captions")
+                .setView(scroll)
+                .setPositiveButton("Apply") { _, _ ->
+                    captionsEnabled = enableSwitch.isChecked
+                    val params = localPlayer?.trackSelectionParameters?.buildUpon()
+                        ?.setDisabledTrackTypes(
+                            if (captionsEnabled) emptySet() else setOf(C.TRACK_TYPE_TEXT))
+                        ?.build()
+                    if (params != null) localPlayer?.trackSelectionParameters = params
+                    ccButton.alpha = if (captionsEnabled) 1f else 0.4f
+                    prefs.edit()
+                        .putInt("cc_bg_alpha", bgBar.progress)
+                        .putFloat("cc_font_size", (sizeBar.progress + 8).toFloat())
+                        .putInt("cc_text_color", colorValues[selectedColorIdx])
+                        .apply()
+                    applySubtitleStyle()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        } else {
+            AlertDialog.Builder(this)
+                .setTitle("Captions")
+                .setView(scroll)
+                .setPositiveButton("Close", null)
+                .show()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_SUBTITLE_FILE && resultCode == RESULT_OK) {
+            val uri = data?.data ?: return
+            // Take persistent read permission so the URI survives restarts
+            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            SubtitleHelper.storeSubtitleUri(this, bookmarkKey, uri)
+            // Reload the player with the new subtitle
+            val saved = localPlayer?.currentPosition ?: 0L
+            localPlayer?.stop()
+            captionsEnabled = true
+            ccButton.alpha = 1f
+            localPlayer?.setMediaItem(buildMediaItem(withSubtitle = true))
+            localPlayer?.prepare()
+            if (saved > 0L) localPlayer?.seekTo(saved)
+            localPlayer?.play()
+            applySubtitleStyle()
+            Toast.makeText(this, "Subtitle loaded", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun initLocalPlayer() {
         val uri = fileUri ?: return
+        playerView.setShowPreviousButton(false)
+        playerView.setShowNextButton(false)
         localPlayer = ExoPlayer.Builder(this).build().also { exo ->
             playerView.player = exo
 
